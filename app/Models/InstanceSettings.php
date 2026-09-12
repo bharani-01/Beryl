@@ -58,6 +58,9 @@ class InstanceSettings extends Model
         'avatar_s3_storage_id',
         'image_cdn_url',
         'is_dashboard_force_https_enabled',
+        'razorpay_key_id',
+        'razorpay_key_secret',
+        'razorpay_webhook_secret',
     ];
 
     protected $hidden = [
@@ -70,6 +73,8 @@ class InstanceSettings extends Model
         'resend_api_key',
         'domain_connect_private_key',
         'sentinel_token',
+        'razorpay_key_secret',
+        'razorpay_webhook_secret',
     ];
 
     protected $casts = [
@@ -97,6 +102,8 @@ class InstanceSettings extends Model
         'webhook_allowed_internal_hosts' => 'array',
         'webhook_allow_localhost' => 'boolean',
         'is_dashboard_force_https_enabled' => 'boolean',
+        'razorpay_key_secret' => 'encrypted',
+        'razorpay_webhook_secret' => 'encrypted',
     ];
 
     protected static function booted(): void

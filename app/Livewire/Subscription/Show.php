@@ -8,7 +8,7 @@ class Show extends Component
 {
     public function mount()
     {
-        if (! isCloud()) {
+        if (! isCloud() && ! subscriptionProvider() && ! currentTeam()?->subscription()->exists()) {
             return redirect()->route('dashboard');
         }
         if (auth()->user()?->isMember()) {

@@ -48,6 +48,22 @@ class Subscription extends Model
 
     public function type()
     {
+        if (! empty($this->stripe_plan_id)) {
+            $plan = strtolower($this->stripe_plan_id);
+            if (str_contains($plan, 'starter') || str_contains($plan, 'hobby')) {
+                return 'starter';
+            }
+            if (str_contains($plan, 'pro')) {
+                return 'pro';
+            }
+            if (str_contains($plan, 'business') || str_contains($plan, 'enterprise')) {
+                return 'business';
+            }
+            if (str_contains($plan, 'trial')) {
+                return 'trial';
+            }
+        }
+
         if (isStripe()) {
             if (! $this->stripe_plan_id) {
                 return 'zero';
@@ -76,6 +92,6 @@ class Subscription extends Model
             }
         }
 
-        return 'zero';
+        return $this->stripe_plan_id ?: 'starter';
     }
 }

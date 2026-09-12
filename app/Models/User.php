@@ -57,6 +57,13 @@ class User extends Authenticatable implements SendsEmail
         'avatar_path',
         'avatar_storage_type',
         'avatar_s3_storage_id',
+        'is_suspended',
+        'suspension_reason',
+        'last_active_at',
+        'total_api_calls',
+        'last_api_call_at',
+        'last_login_at',
+        'last_login_ip',
     ];
 
     protected $hidden = [
@@ -70,9 +77,49 @@ class User extends Authenticatable implements SendsEmail
         'current_team_id' => 'integer',
         'email_verified_at' => 'datetime',
         'force_password_reset' => 'boolean',
+        'is_suspended' => 'boolean',
         'show_boarding' => 'boolean',
         'email_change_code_expires_at' => 'datetime',
+        'last_active_at' => 'datetime',
+        'total_api_calls' => 'integer',
+        'last_api_call_at' => 'datetime',
+        'last_login_at' => 'datetime',
     ];
+
+    public function apiLogs()
+    {
+        return $this->hasMany(ApiLog::class);
+    }
+
+    public function auditLogs()
+    {
+        return $this->hasMany(AuditLog::class);
+    }
+
+    public function isOnline(): bool
+    {
+        return $this->last_active_at !== null && $this->last_active_at->gt(now()->subMinutes(15));
+    }
+
+    public function presenceStatus(): string
+    {
+        if (! $this->last_active_at) {
+            return 'offline';
+        }
+        if ($this->last_active_at->gt(now()->subMinutes(15))) {
+            return 'online';
+        }
+        if ($this->last_active_at->gt(now()->subHours(2))) {
+            return 'idle';
+        }
+
+        return 'offline';
+    }
+
+    public function isSuspended(): bool
+    {
+        return (bool) $this->is_suspended;
+    }
 
     /**
      * Set the email attribute to lowercase.

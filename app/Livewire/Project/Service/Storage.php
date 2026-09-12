@@ -215,6 +215,16 @@ class Storage extends Component
                 'host_path.regex' => 'Host path must start with / and only contain safe path characters.',
             ]));
 
+            $team = currentTeam();
+            if ($team && $team->id !== 0) {
+                $usage = teamStorageUsage($team);
+                if (! $usage['is_unlimited'] && $usage['volumes_count'] >= $usage['max_volumes']) {
+                    $this->dispatch('error', 'Volume limit reached', "Your workspace allows up to {$usage['max_volumes']} persistent volumes ({$usage['storage_limit_formatted']} storage quota). Please upgrade or contact your administrator.");
+
+                    return;
+                }
+            }
+
             $name = $this->resource->uuid.'-'.$this->name;
 
             LocalPersistentVolume::create([

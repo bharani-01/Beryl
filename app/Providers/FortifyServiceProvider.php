@@ -84,6 +84,10 @@ class FortifyServiceProvider extends ServiceProvider
                     return redirect()->to($target);
                 }
 
+                if ($request->user() && ($request->user()->id === 0 || $request->user()->isInstanceAdmin())) {
+                    return redirect()->route('admin.index');
+                }
+
                 return redirect()->to(Fortify::redirects('login'));
             }
         });
@@ -101,6 +105,10 @@ class FortifyServiceProvider extends ServiceProvider
                 $target = ($this->resolveSafeRedirect)($request);
                 if ($target) {
                     return redirect()->to($target);
+                }
+
+                if ($request->user() && ($request->user()->id === 0 || $request->user()->isInstanceAdmin())) {
+                    return redirect()->route('admin.index');
                 }
 
                 return redirect()->to(Fortify::redirects('login'));
@@ -158,6 +166,12 @@ class FortifyServiceProvider extends ServiceProvider
                 $user &&
                 Hash::check($request->password, $user->password)
             ) {
+                if ($user->is_suspended && ! ($user->id === 0 || $user->isInstanceAdmin())) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        Fortify::username() => 'Your account has been suspended by an administrator. Please contact support.',
+                    ]);
+                }
+
                 $user->updated_at = now();
                 $user->save();
 

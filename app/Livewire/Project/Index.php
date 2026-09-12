@@ -10,8 +10,12 @@ class Index extends Component
 {
     public $projects;
 
-    public function mount(): void
+    public function mount()
     {
+        if ((auth()->id() === 0 || isInstanceAdmin()) && ! session('impersonating')) {
+            return redirect()->route('admin.index');
+        }
+
         // Only load what the page renders. Servers/private keys were previously
         // hydrated into public Livewire state but never used by the view.
         $this->projects = Project::ownedByCurrentTeam()
@@ -29,11 +33,14 @@ class Index extends Component
                 'mariadbs',
             ])
             ->get();
+
+        return null;
     }
 
     public function render(): View
     {
         return view('livewire.project.index', [
+            'projects' => $this->projects,
             'projectsJs' => $this->projects->map(function (Project $project): array {
                 $firstEnvironment = $project->environments->first();
                 $resourceCount = collect([

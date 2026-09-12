@@ -1,8 +1,8 @@
 <div wire:init="loadRefundEligibility" class="application-settings-workspace flex flex-col gap-6" x-data="{
-    qty: {{ $quantity }},
+    qty: {{ $quantity ?? 2 }},
     get current() { return $wire.server_limits; },
     activeServers: {{ currentTeam()->servers->count() }},
-    preview: @js($pricePreview),
+    preview: @js($pricePreview ?? null),
     loading: false,
     showModal: false,
     async fetchPreview() {
@@ -298,5 +298,41 @@
             Need help? <a class="underline dark:text-white" href="{{ config('constants.urls.contact') }}"
                 target="_blank">Contact us.</a>
         </div>
+    @else
+        {{-- Razorpay & Active Subscription View --}}
+        <div class="space-y-6">
+            {{-- Active Paid Subscription Banner (Shown only when active paid subscription exists) --}}
+            @if ($isPaid)
+                <div class="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-5 shadow-2xs dark:border-emerald-500/20 dark:bg-emerald-950/20">
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                        <div class="flex items-center gap-3">
+                            <div class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500 text-white shadow-sm">
+                                <x-reicon name="check-circle" class="size-6" />
+                            </div>
+                            <div>
+                                <h3 class="text-base font-bold text-neutral-900 dark:text-fg">Subscription Active &amp; Verified</h3>
+                                <p class="text-[12px] text-neutral-600 dark:text-fg-dim">
+                                    Your team is actively subscribed to the <strong class="text-emerald-600 dark:text-emerald-400 font-semibold">{{ $planName }} Plan</strong>. All cloud resources and high-performance server limits are active.
+                                </p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/20 px-3 py-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">
+                                <span class="size-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                                Active &amp; Paid
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            @endif
+
+            {{-- Subscription Pricing Plans with Payment States --}}
+            <livewire:subscription.pricing-plans />
+
+            <div class="text-sm text-neutral-500">
+                Need billing assistance or custom enterprise limits? <a class="underline dark:text-white" href="{{ config('constants.urls.contact') }}" target="_blank">Contact our billing team.</a>
+            </div>
+        </div>
     @endif
 </div>
+

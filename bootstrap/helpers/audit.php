@@ -36,6 +36,22 @@ if (! function_exists('auditLog')) {
             $payload = array_merge($base, $context);
 
             Log::channel('audit')->{$level}($event, $payload);
+
+            try {
+                if (class_exists(\App\Models\AuditLog::class) && \Illuminate\Support\Facades\Schema::hasTable('audit_logs')) {
+                    \App\Models\AuditLog::create([
+                        'event' => $event,
+                        'level' => $level,
+                        'user_id' => $user?->id,
+                        'user_email' => $user?->email,
+                        'ip' => $request?->ip(),
+                        'method' => $request?->method(),
+                        'path' => $request?->path(),
+                        'payload' => $payload,
+                    ]);
+                }
+            } catch (Throwable) {
+            }
         } catch (Throwable $e) {
             // Audit logging must never break the request path.
             try {
@@ -64,13 +80,33 @@ if (! function_exists('auditLogWebhookFailure')) {
                 'ua' => substr((string) $request?->userAgent(), 0, 200),
                 'method' => $request?->method(),
                 'path' => $request?->path(),
-                'event_header' => $request?->header('X-GitHub-Event')
+                'event_header' => $request?->header('X-Razorpay-Signature')
+                    ?? $request?->header('X-GitHub-Event')
                     ?? $request?->header('X-Gitlab-Event')
                     ?? $request?->header('X-Gitea-Event')
-                    ?? $request?->header('X-Event-Key'),
+                    ?? $request?->header('X-Event-Key')
+                    ?? $request?->header('Stripe-Signature'),
             ];
 
-            Log::channel('audit')->warning($event, array_merge($base, $context));
+            $payload = array_merge($base, $context);
+
+            Log::channel('audit')->warning($event, $payload);
+
+            try {
+                if (class_exists(\App\Models\AuditLog::class) && \Illuminate\Support\Facades\Schema::hasTable('audit_logs')) {
+                    \App\Models\AuditLog::create([
+                        'event' => $event,
+                        'level' => 'warning',
+                        'user_id' => null,
+                        'user_email' => 'system@webhook',
+                        'ip' => $request?->ip(),
+                        'method' => $request?->method(),
+                        'path' => $request?->path(),
+                        'payload' => $payload,
+                    ]);
+                }
+            } catch (Throwable) {
+            }
         } catch (Throwable $e) {
             try {
                 Log::warning('auditLogWebhookFailure failed: '.$e->getMessage(), ['provider' => $provider]);

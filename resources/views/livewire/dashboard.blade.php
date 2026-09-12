@@ -49,12 +49,6 @@
             </p>
         </div>
         <div class="flex w-fit shrink-0 items-center gap-2">
-            @if (isInstanceAdmin() || auth()->id() === 0)
-                <a href="{{ route('admin.index') }}" {{ wireNavigate() }} class="button whitespace-nowrap">
-                    <x-reicon name="shield-check" class="size-3.5 text-purple-500" />
-                    Admin Console
-                </a>
-            @endif
             <a href="{{ $deployAppUrl }}" {{ wireNavigate() }} class="button button-highlighted whitespace-nowrap">
                 <x-reicon name="plus" class="size-3.5" />
                 New resource
@@ -80,6 +74,16 @@
                 <span x-show="!copied"><x-reicon name="file" class="size-3" /></span>
                 <span x-show="copied" style="display: none;"><x-reicon name="check-circle" class="size-3 text-emerald-500 inline" /></span>
             </button>
+        </div>
+
+        @php
+            $storageQuota = teamStorageUsage();
+        @endphp
+        <div class="flex items-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-2.5 py-1 text-neutral-600 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-dim">
+            <x-reicon name="database" class="size-3 text-purple-500" />
+            <span class="text-neutral-400 dark:text-fg-faint">Storage Quota:</span>
+            <span class="font-semibold text-neutral-800 dark:text-fg">{{ $storageQuota['storage_limit_formatted'] }}</span>
+            <span class="text-[10px] text-neutral-400 dark:text-fg-faint font-normal">({{ $storageQuota['volumes_count'] }} {{ Str::plural('volume', $storageQuota['volumes_count']) }})</span>
         </div>
     </div>
 

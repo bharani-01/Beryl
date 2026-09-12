@@ -338,7 +338,125 @@
             }
         }
         window.copyToClipboard = copyToClipboard;
+
+        window.openRazorpayModal = function(data) {
+            if (Array.isArray(data)) data = data[0];
+            if (!data || !data.key) {
+                console.error('Invalid checkout payload', data);
+                if (window.Livewire) {
+                    window.Livewire.dispatch('razorpayPaymentFailed', { reason: 'Invalid payment options received from server.' });
+                }
+                return;
+            }
+
+            function launch() {
+                if (typeof Razorpay === 'undefined') {
+                    const failMsg = 'Payment SDK loading failed. Please check your internet connection.';
+                    if (window.Livewire) {
+                        window.Livewire.dispatch('razorpayPaymentFailed', { reason: failMsg });
+                    }
+                    if (window.toast) {
+                        window.toast('Error', {
+                            type: 'danger',
+                            description: failMsg,
+                        });
+                    } else {
+                        alert(failMsg);
+                    }
+                    return;
+                }
+
+                const options = {
+                    key: data.key,
+                    amount: data.amount,
+                    currency: data.currency || 'INR',
+                    name: data.name || 'Coolify',
+                    description: data.description || 'Plan Subscription',
+                    order_id: data.order_id,
+                    prefill: data.prefill || {},
+                    notes: data.notes || {},
+                    theme: data.theme || { color: '#8b5cf6' },
+                    handler: function (response) {
+                        const payload = {
+                            razorpay_payment_id: response.razorpay_payment_id,
+                            razorpay_order_id: response.razorpay_order_id,
+                            razorpay_signature: response.razorpay_signature,
+                            plan: data.plan,
+                            interval: data.interval || 'monthly'
+                        };
+                        window._rzpPaid = true;
+                        if (window.Livewire) {
+                            window.Livewire.dispatch('razorpayPaymentProcessing');
+                            window.Livewire.dispatch('verifyRazorpayPayment', { payload: payload });
+                        }
+                    },
+                    modal: {
+                        ondismiss: function () {
+                            if (!window._rzpPaid && window.Livewire) {
+                                window.Livewire.dispatch('razorpayPaymentDismissed', { reason: 'Checkout window was closed before completing payment.' });
+                            }
+                            console.log('Razorpay checkout window closed by user.');
+                        }
+                    }
+                };
+
+                const rzp = new Razorpay(options);
+                rzp.on('payment.failed', function (resp) {
+                    const failMsg = resp.error?.description || 'Transaction unsuccessful.';
+                    if (window.Livewire) {
+                        window.Livewire.dispatch('razorpayPaymentFailed', { reason: failMsg });
+                    }
+                    if (window.toast) {
+                        window.toast('Payment Failed', {
+                            type: 'danger',
+                            description: failMsg,
+                        });
+                    } else {
+                        alert('Payment failed: ' + failMsg);
+                    }
+                });
+                window._rzpPaid = false;
+                try {
+                    rzp.open();
+                } catch (e) {
+                    console.error('Razorpay modal open failed:', e);
+                    if (window.Livewire) {
+                        window.Livewire.dispatch('razorpayPaymentFailed', { reason: 'Failed to open payment modal: ' + (e.message || 'Unknown error') });
+                    }
+                }
+            }
+
+            if (typeof Razorpay === 'undefined') {
+                const s = document.createElement('script');
+                s.src = 'https://checkout.razorpay.com/v1/checkout.js';
+                s.onload = launch;
+                s.onerror = function() {
+                    const failMsg = 'Failed to load Razorpay payment gateway script. Please check your internet connection or ad blocker.';
+                    if (window.Livewire) {
+                        window.Livewire.dispatch('razorpayPaymentFailed', { reason: failMsg });
+                    }
+                    if (window.toast) {
+                        window.toast('Error', {
+                            type: 'danger',
+                            description: failMsg,
+                        });
+                    } else {
+                        alert(failMsg);
+                    }
+                };
+                document.head.appendChild(s);
+            } else {
+                launch();
+            }
+        };
+
+        window.addEventListener('openRazorpayCheckout', (e) => window.openRazorpayModal(e.detail));
+        window.addEventListener('open-razorpay-checkout', (e) => window.openRazorpayModal(e.detail));
+
         document.addEventListener('livewire:init', () => {
+            window.Livewire.on('openRazorpayCheckout', (data) => {
+                window.openRazorpayModal(data);
+            });
             window.Livewire.on('reloadWindow', (timeout) => {
                 if (timeout) {
                     setTimeout(() => {

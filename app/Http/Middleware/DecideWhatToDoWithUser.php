@@ -16,6 +16,16 @@ class DecideWhatToDoWithUser
     public function handle(Request $request, Closure $next): Response
     {
         if ($user = auth()->user()) {
+            if ($user->is_suspended && ! (isInstanceAdmin() || $user->id === 0)) {
+                auth()->guard('web')->logout();
+                $request->session()->invalidate();
+                $request->session()->regenerateToken();
+
+                return redirect()->route('login')->withErrors([
+                    'email' => 'Your account has been suspended by an administrator. Please contact support.',
+                ]);
+            }
+
             if ($user->teams?->count() === 0) {
                 $currentTeam = $user->recreate_personal_team();
                 refreshSession($currentTeam);

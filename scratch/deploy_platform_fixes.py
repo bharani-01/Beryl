@@ -31,6 +31,12 @@ def scp_file(local_file, remote_dest):
     return True
 
 FILES = [
+    # Storage limitation migration & models
+    "database/migrations/2026_09_12_140000_add_custom_storage_limit_to_teams_table.php",
+    "app/Models/Team.php",
+    "bootstrap/helpers/subscriptions.php",
+    "app/Livewire/Project/Service/Storage.php",
+
     # Multi-server / Multi-tenant authorization fixes
     "bootstrap/helpers/remoteProcess.php",
     "app/Livewire/ActivityMonitor.php",
@@ -47,9 +53,19 @@ FILES = [
     "resources/views/components/top-user-menu.blade.php",
     "resources/views/layouts/app.blade.php",
     "resources/views/livewire/dashboard.blade.php",
+
+    # Admin access enforcement & routing
+    "app/Livewire/Dashboard.php",
+    "app/Livewire/Project/Index.php",
+    # User model, suspension migration & middleware
+    "database/migrations/2026_09_12_150000_add_status_and_suspension_to_users_table.php",
+    "app/Models/User.php",
+    "app/Http/Middleware/DecideWhatToDoWithUser.php",
+    "app/Providers/FortifyServiceProvider.php",
+    "routes/web.php",
 ]
 
-print("=== DEPLOYING PLATFORM & MULTI-SERVER FIXES ===", flush=True)
+print("=== DEPLOYING PLATFORM, STORAGE & ADMIN STATUS FIXES ===", flush=True)
 base_dir = "d:/syncd"
 
 for rel_path in FILES:
@@ -69,7 +85,7 @@ for rel_path in FILES:
     sudo mkdir -p $(dirname {override_dest})
     sudo cp {tmp_name} {override_dest} 2>/dev/null || true
     sudo docker exec coolify mkdir -p $(dirname {container_dest})
-    sudo docker exec -i coolify sh -c "cat > {container_dest}" < {tmp_name}
+    sudo docker cp {tmp_name} coolify:{container_dest}
     rm -f {tmp_name}
     """
     res = run_ssh(remote_script)
@@ -78,8 +94,12 @@ for rel_path in FILES:
     else:
         print(f"  [WARN] Issue deploying {rel_path}", flush=True)
 
+print("\n=== RUNNING MIGRATIONS ===", flush=True)
+res_migrate = run_ssh("sudo docker exec coolify php artisan migrate --force")
+print(res_migrate.stdout)
+
 print("\n=== CLEARING CACHES ===", flush=True)
 run_ssh("sudo docker exec coolify php artisan view:clear")
 run_ssh("sudo docker exec coolify php artisan config:clear")
 run_ssh("sudo docker exec coolify php artisan route:clear")
-print("Caches cleared successfully.", flush=True)
+print("Deployment completed successfully.", flush=True)

@@ -38,11 +38,69 @@ class Actions extends Component
 
     public ?string $nextBillingDate = null;
 
+    public ?array $planDetails = null;
+
+    public ?array $resourceLimits = null;
+
+    public ?array $storageUsage = null;
+
+    public bool $isRazorpay = false;
+
+    public ?string $paymentId = null;
+
+    public ?string $planName = null;
+
+    public ?string $planPrice = null;
+
+    public bool $isPaid = false;
+
+    public bool $isOnTrial = false;
+
+    public int $trialDaysLeft = 0;
+
     public function mount(): void
     {
+        $team = currentTeam();
+        $team?->refresh();
+        $team?->load('subscription');
+
         $this->server_limits = Team::serverLimit();
         $this->quantity = (int) $this->server_limits;
-        $this->billingInterval = currentTeam()->subscription?->billingInterval() ?? 'monthly';
+        $this->billingInterval = $team?->subscription?->billingInterval() ?? 'monthly';
+
+        $sub = $team?->subscription;
+        $planId = strtolower($sub?->stripe_plan_id ?? '');
+        $isTrialOrFree = empty($planId) || $planId === 'trial' || $planId === 'free';
+        $this->isPaid = (bool) ($sub?->stripe_invoice_paid ?? false) && ! $isTrialOrFree;
+        $this->isOnTrial = isTeamOnTrial($team) && ! $this->isPaid;
+        $this->trialDaysLeft = trialDaysRemaining($team);
+
+        $this->isRazorpay = str_starts_with((string) $sub?->stripe_subscription_id, 'sub_rzp_')
+            || str_starts_with((string) $sub?->stripe_customer_id, 'cust_rzp_')
+            || subscriptionProvider() === 'razorpay';
+
+        $this->paymentId = $sub?->stripe_subscription_id ? str_replace('sub_rzp_', '', $sub->stripe_subscription_id) : null;
+
+        if (function_exists('teamResourceLimits')) {
+            $this->resourceLimits = teamResourceLimits($team);
+        } else {
+            $this->resourceLimits = ['plan' => 'starter', 'cpu' => '1.0', 'memory' => '1G', 'storage' => '20 GB', 'max_apps' => 3, 'max_volumes' => 5];
+        }
+
+        if (function_exists('teamStorageUsage')) {
+            $this->storageUsage = teamStorageUsage($team);
+        }
+
+        if (function_exists('getSubscriptionPlans')) {
+            $plans = getSubscriptionPlans();
+            $planKey = $this->resourceLimits['plan'] ?? 'starter';
+            $this->planDetails = $plans[$planKey] ?? ($plans['starter'] ?? []);
+            $this->planName = $this->planDetails['name'] ?? ucfirst($planKey);
+            $this->planPrice = $this->planDetails['price_formatted'] ?? '₹499';
+        } else {
+            $this->planName = 'Starter';
+            $this->planPrice = '₹499';
+        }
     }
 
     public function loadPricePreview(int $quantity): void
@@ -213,7 +271,16 @@ class Actions extends Component
 
     private function checkRefundEligibility(): void
     {
-        if (! isCloud() || ! currentTeam()->subscription?->stripe_subscription_id) {
+        $sub = currentTeam()->subscription;
+        if (! isCloud() || ! $sub?->stripe_subscription_id) {
+            return;
+        }
+
+        if (str_starts_with((string) $sub->stripe_subscription_id, 'sub_rzp_')
+            || str_starts_with((string) $sub->stripe_customer_id, 'cust_rzp_')
+            || $this->isRazorpay) {
+            $this->refundCheckLoading = false;
+
             return;
         }
 
@@ -229,5 +296,10 @@ class Actions extends Component
         } catch (\Exception $e) {
             \Log::warning('Refund eligibility check failed: '.$e->getMessage());
         }
+    }
+
+    public function render()
+    {
+        return view('livewire.subscription.actions', get_object_vars($this));
     }
 }

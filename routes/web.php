@@ -157,6 +157,28 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('/', Dashboard::class)->name('dashboard');
     Route::get('/admin', AdminIndex::class)->name('admin.index');
+    Route::get('/leave-impersonation', function () {
+        if (session('impersonating')) {
+            $adminId = session('impersonator_id', 0);
+            session()->forget('impersonating');
+            session()->forget('impersonator_id');
+            $admin = \App\Models\User::find($adminId) ?? \App\Models\User::find(0) ?? \App\Models\User::first();
+            if ($admin) {
+                $team = $admin->resolveStoredTeam() ?? $admin->teams->first();
+                \Illuminate\Support\Facades\Auth::login($admin);
+                refreshSession($team);
+                if (function_exists('auditLog')) {
+                    auditLog('admin.impersonation.stopped', [
+                        'restored_user_id' => $admin->id,
+                        'restored_email' => $admin->email,
+                    ]);
+                }
+            }
+        }
+
+        return redirect()->route('admin.index');
+    })->name('impersonation.leave');
+    Route::get('/stop-impersonating', fn () => redirect()->route('impersonation.leave'));
     Route::get('/onboarding', BoardingIndex::class)->name('onboarding');
 
     Route::get('/subscription', SubscriptionShow::class)->name('subscription.show');
@@ -401,6 +423,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
 Route::middleware(['auth'])->group(function () {
     Route::get('/select-team', SelectTeam::class)->name('team.select');
     Route::get('/sources', function () {
+        if ((auth()->id() === 0 || isInstanceAdmin()) && ! session('impersonating')) {
+            return redirect()->route('admin.index');
+        }
+
         $sources = currentTeam()->sources();
 
         return view('source.all', [

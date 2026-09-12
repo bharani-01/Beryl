@@ -47,6 +47,7 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         'personal_team',
         'show_boarding',
         'custom_server_limit',
+        'custom_storage_limit_gb',
         'is_mcp_server_enabled',
     ];
 
@@ -57,6 +58,7 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
     protected $casts = [
         'personal_team' => 'boolean',
         'is_mcp_server_enabled' => 'boolean',
+        'custom_storage_limit_gb' => 'integer',
     ];
 
     protected static function booted()

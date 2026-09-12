@@ -26,7 +26,7 @@ class Index extends Component
 
     public function mount()
     {
-        if (! isCloud()) {
+        if (! isCloud() && ! subscriptionProvider() && ! currentTeam()?->subscription()->exists()) {
             return redirect(RouteServiceProvider::HOME);
         }
         if (auth()->user()?->isMember()) {
@@ -37,7 +37,7 @@ class Index extends Component
         }
         $this->settings = instanceSettings();
         $this->alreadySubscribed = currentTeam()->subscription()->exists();
-        if (! $this->alreadySubscribed) {
+        if (! $this->alreadySubscribed || subscriptionProvider() !== 'stripe') {
             $this->loading = false;
         }
     }

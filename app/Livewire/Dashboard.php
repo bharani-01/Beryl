@@ -67,6 +67,10 @@ class Dashboard extends Component
 
     public function mount()
     {
+        if ((auth()->id() === 0 || isInstanceAdmin()) && ! session('impersonating')) {
+            return redirect()->route('admin.index');
+        }
+
         $team = currentTeam();
         $this->teamName = $team?->name ?? 'Workspace';
         $this->teamUuid = $team?->uuid ?? null;
