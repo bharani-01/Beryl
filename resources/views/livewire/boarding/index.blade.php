@@ -1,13 +1,13 @@
 @php use App\Enums\ProxyTypes; @endphp
 <x-slot:title>
-    Onboarding | Coolify
+    Onboarding | Beryl
     </x-slot>
     <section class="application-settings-form w-full py-6">
         <div class="flex w-full flex-col items-center space-y-6">
             @if ($currentState === 'welcome')
                 <div class="w-full max-w-3xl">
                     <div class="mb-6 text-center">
-                        <h1 class="text-2xl! font-semibold!">Welcome to Coolify</h1>
+                        <h1 class="text-2xl! font-semibold!">Welcome to Beryl</h1>
                         <p class="mt-1 text-[13px] text-neutral-500 dark:text-fg-dim">
                             Connect your first server and start deploying in minutes.
                         </p>
@@ -63,12 +63,12 @@
                 <x-boarding-progress :currentStep="0" />
                 <x-boarding-step title="Platform Overview">
                     <x-slot:question>
-                        Coolify automates deployment and infrastructure management on your own servers. Deploy applications
+                        Beryl automates deployment and infrastructure management on your own servers. Deploy applications
                         from Git, manage databases, and monitor everything without vendor lock-in.
                     </x-slot:question>
                     <x-slot:explanation>
                         <p>
-                            <x-highlighted text="Automation:" /> Coolify handles server configuration, Docker management,
+                            <x-highlighted text="Automation:" /> Beryl handles server configuration, Docker management,
                             and
                             deployments automatically.
                         </p>

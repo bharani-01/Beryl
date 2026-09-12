@@ -525,7 +525,7 @@ class Server extends BaseModel
         $teamId = $team?->id ?? 0;
 
         $query = Server::where(function ($q) use ($teamId) {
-            $q->whereTeamId($teamId)->orWhere('id', 0);
+            $q->whereTeamId($teamId)->orWhere('id', 0)->orWhere('team_id', 0);
         })->with('settings', 'swarmDockers', 'standaloneDockers')->orderBy('name');
 
         return $query
@@ -1409,7 +1409,7 @@ $siteAddress {
 
         try {
             $output = instant_remote_process([
-                'echo "---PRETTY_NAME---" && grep PRETTY_NAME /etc/os-release | cut -d= -f2 | tr -d \'"\' && echo "---ARCH---" && uname -m && echo "---KERNEL---" && uname -r && echo "---CPUS---" && nproc && echo "---MEMORY---" && free -b | awk \'/Mem:/{print $2}\' && echo "---UPTIME_SINCE---" && uptime -s && echo "---DOCKER---" && (docker version --format \'{{.Server.Version}}\' 2>/dev/null || true) && echo "---COMPOSE---" && (docker compose version --short 2>/dev/null || true)',
+                'echo "---PRETTY_NAME---" && grep PRETTY_NAME /etc/os-release | cut -d= -f2 | tr -d \'"\' && echo "---ARCH---" && uname -m && echo "---KERNEL---" && uname -r && echo "---CPUS---" && nproc && echo "---MEMORY---" && free -b | awk \'/Mem:/{print $2}\' && echo "---SWAP---" && free -b | awk \'/Swap:/{print $2}\' && echo "---UPTIME_SINCE---" && uptime -s && echo "---DOCKER---" && (docker version --format \'{{.Server.Version}}\' 2>/dev/null || true) && echo "---COMPOSE---" && (docker compose version --short 2>/dev/null || true)',
             ], $this, false);
 
             if (! $output) {
@@ -1433,6 +1433,7 @@ $siteAddress {
                 'kernel' => $sections['KERNEL'] ?? 'Unknown',
                 'cpus' => (int) ($sections['CPUS'] ?? 0),
                 'memory_bytes' => (int) ($sections['MEMORY'] ?? 0),
+                'swap_bytes' => (int) ($sections['SWAP'] ?? 0),
                 'uptime_since' => $sections['UPTIME_SINCE'] ?? null,
                 'collected_at' => now()->toIso8601String(),
             ];

@@ -12,7 +12,9 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\ServiceProvider;
+use Laravel\Fortify\Contracts\LoginResponse;
 use Laravel\Fortify\Contracts\RegisterResponse;
+use Laravel\Fortify\Contracts\TwoFactorLoginResponse;
 use Laravel\Fortify\Fortify;
 
 class FortifyServiceProvider extends ServiceProvider
@@ -32,6 +34,76 @@ class FortifyServiceProvider extends ServiceProvider
                 }
 
                 return redirect(RouteServiceProvider::HOME);
+            }
+        });
+
+        $resolveSafeRedirect = function ($request): ?string {
+            $redirect = $request->input('redirect') ?: session()->pull('url.intended');
+            if (empty($redirect) || ! is_string($redirect)) {
+                return null;
+            }
+
+            // Reject protocol-relative URLs: e.g. "//attacker.com"
+            if (str_starts_with($redirect, '//')) {
+                $clean = ltrim($redirect, '/');
+                if (! str_starts_with($clean, $request->getHost().'/')) {
+                    return null;
+                }
+            }
+
+            $scheme = parse_url($redirect, PHP_URL_SCHEME);
+            if ($scheme && ! in_array(strtolower($scheme), ['http', 'https'], true)) {
+                return null;
+            }
+
+            $host = parse_url($redirect, PHP_URL_HOST);
+            if ($host && strtolower($host) !== strtolower($request->getHost())) {
+                return null;
+            }
+
+            $path = parse_url($redirect, PHP_URL_PATH) ?? '';
+            if (str_starts_with($path, '/api') || str_starts_with($path, '/livewire')) {
+                return null;
+            }
+
+            return $redirect;
+        };
+
+        $this->app->instance(LoginResponse::class, new class($resolveSafeRedirect) implements LoginResponse
+        {
+            public function __construct(protected \Closure $resolveSafeRedirect) {}
+
+            public function toResponse($request)
+            {
+                if ($request->wantsJson()) {
+                    return response()->json(['two_factor' => false]);
+                }
+
+                $target = ($this->resolveSafeRedirect)($request);
+                if ($target) {
+                    return redirect()->to($target);
+                }
+
+                return redirect()->to(Fortify::redirects('login'));
+            }
+        });
+
+        $this->app->instance(TwoFactorLoginResponse::class, new class($resolveSafeRedirect) implements TwoFactorLoginResponse
+        {
+            public function __construct(protected \Closure $resolveSafeRedirect) {}
+
+            public function toResponse($request)
+            {
+                if ($request->wantsJson()) {
+                    return response()->noContent();
+                }
+
+                $target = ($this->resolveSafeRedirect)($request);
+                if ($target) {
+                    return redirect()->to($target);
+                }
+
+                return redirect()->to(Fortify::redirects('login'));
             }
         });
     }
@@ -64,9 +136,18 @@ class FortifyServiceProvider extends ServiceProvider
                 return redirect()->route('register');
             }
 
+            if (request()->has('redirect') && filled(request()->get('redirect'))) {
+                $redirect = (string) request()->get('redirect');
+                $host = parse_url($redirect, PHP_URL_HOST);
+                if (empty($host) || strtolower($host) === strtolower(request()->getHost())) {
+                    session(['url.intended' => $redirect]);
+                }
+            }
+
             return view('auth.login', [
                 'is_registration_enabled' => $settings->is_registration_enabled,
                 'enabled_oauth_providers' => $enabled_oauth_providers,
+                'redirect' => request('redirect') ?? session('url.intended'),
             ]);
         });
 

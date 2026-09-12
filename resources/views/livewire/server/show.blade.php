@@ -136,6 +136,10 @@
                         @endif
                     </x-application.settings-section>
 
+                    @if ($server->isFunctional())
+                        @include('livewire.server.partials.server-live-monitor', ['server' => $server])
+                    @endif
+
                     <x-application.settings-section id="server-connection-section" title="Connection"
                         helper="Configure how Coolify identifies, reaches, and validates this server.">
                         <x-slot:actions>

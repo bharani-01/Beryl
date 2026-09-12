@@ -46,7 +46,21 @@ class OauthController extends Controller
                 session(['currentTeam' => $user->currentTeam = $team]);
             }
 
-            return redirect('/');
+            $redirect = session()->pull('url.intended');
+            if (! empty($redirect) && is_string($redirect)) {
+                $host = parse_url($redirect, PHP_URL_HOST);
+                if (empty($host) || strtolower($host) === strtolower(request()->getHost())) {
+                    $scheme = parse_url($redirect, PHP_URL_SCHEME);
+                    if (! $scheme || in_array(strtolower($scheme), ['http', 'https'], true)) {
+                        $path = parse_url($redirect, PHP_URL_PATH) ?? '';
+                        if (! str_starts_with($path, '/api') && ! str_starts_with($path, '/livewire')) {
+                            return redirect()->to($redirect);
+                        }
+                    }
+                }
+            }
+
+            return redirect()->intended('/');
         } catch (\Exception $e) {
             $errorCode = $e instanceof HttpException ? 'auth.failed' : 'auth.failed.callback';
 

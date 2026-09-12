@@ -87,7 +87,7 @@
                     <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Projects</span>
                 </a>
             </li>
-            @can('canAccessTerminal')
+            @if ((auth()->id() === 0 || isInstanceAdmin()) && auth()->user()->can('canAccessTerminal'))
                 <li>
                     <a title="Terminal"
                         class="{{ request()->is('terminal*') ? 'menu-item-active menu-item' : 'menu-item' }}"
@@ -96,7 +96,7 @@
                         <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Terminal</span>
                     </a>
                 </li>
-            @endcan
+            @endif
             {{-- Infrastructure --}}
             @if (currentTeam()?->id === 0)
                 <li class="nav-section mt-3" :class="collapsed && 'lg:hidden'">Infrastructure</li>
@@ -125,22 +125,26 @@
                     <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Sources</span>
                 </a>
             </li>
-            <li>
-                <a title="S3 Storage" {{ wireNavigate() }}
-                    class="{{ request()->is('storages*') ? 'menu-item-active menu-item' : 'menu-item' }}"
-                    :class="collapsed && 'lg:justify-center lg:px-0'" href="{{ route('storage.index') }}">
-                    <x-reicon name="storages" class="menu-item-icon" />
-                    <span class="menu-item-label" :class="collapsed && 'lg:hidden'">S3 Storage</span>
-                </a>
-            </li>
-            <li>
-                <a title="Shared variables" {{ wireNavigate() }}
-                    class="{{ request()->is('shared-variables*') ? 'menu-item-active menu-item' : 'menu-item' }}"
-                    :class="collapsed && 'lg:justify-center lg:px-0'" href="{{ route('shared-variables.index') }}">
-                    <x-reicon name="variables" class="menu-item-icon" />
-                    <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Shared Variables</span>
-                </a>
-            </li>
+            @if (isInstanceAdmin())
+                <li>
+                    <a title="S3 Storage" {{ wireNavigate() }}
+                        class="{{ request()->is('storages*') ? 'menu-item-active menu-item' : 'menu-item' }}"
+                        :class="collapsed && 'lg:justify-center lg:px-0'" href="{{ route('storage.index') }}">
+                        <x-reicon name="storages" class="menu-item-icon" />
+                        <span class="menu-item-label" :class="collapsed && 'lg:hidden'">S3 Storage</span>
+                    </a>
+                </li>
+            @endif
+            @if (isInstanceAdmin())
+                <li>
+                    <a title="Shared variables" {{ wireNavigate() }}
+                        class="{{ request()->is('shared-variables*') ? 'menu-item-active menu-item' : 'menu-item' }}"
+                        :class="collapsed && 'lg:justify-center lg:px-0'" href="{{ route('shared-variables.index') }}">
+                        <x-reicon name="variables" class="menu-item-icon" />
+                        <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Shared Variables</span>
+                    </a>
+                </li>
+            @endif
 
             {{-- Manage --}}
             <li class="nav-section mt-3" :class="collapsed && 'lg:hidden'">Manage</li>
@@ -152,23 +156,25 @@
                     <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Team</span>
                 </a>
             </li>
-            <li>
-                <a title="Notifications" {{ wireNavigate() }}
-                    class="{{ request()->is('notifications*') ? 'menu-item-active menu-item' : 'menu-item' }}"
-                    :class="collapsed && 'lg:justify-center lg:px-0'" href="{{ route('notifications.email') }}">
-                    <x-reicon name="notifications" class="menu-item-icon" />
-                    <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Notifications</span>
-                </a>
-            </li>
+            @if (isInstanceAdmin())
+                <li>
+                    <a title="Notifications" {{ wireNavigate() }}
+                        class="{{ request()->is('notifications*') ? 'menu-item-active menu-item' : 'menu-item' }}"
+                        :class="collapsed && 'lg:justify-center lg:px-0'" href="{{ route('notifications.email') }}">
+                        <x-reicon name="notifications" class="menu-item-icon" />
+                        <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Notifications</span>
+                    </a>
+                </li>
 
-            <li>
-                <a title="Keys & Tokens" {{ wireNavigate() }}
-                    class="{{ request()->is('security*') ? 'menu-item-active menu-item' : 'menu-item' }}"
-                    :class="collapsed && 'lg:justify-center lg:px-0'" href="{{ route('security.private-key.index') }}">
-                    <x-reicon name="keys" class="menu-item-icon" />
-                    <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Keys & Tokens</span>
-                </a>
-            </li>
+                <li>
+                    <a title="Keys & Tokens" {{ wireNavigate() }}
+                        class="{{ request()->is('security*') ? 'menu-item-active menu-item' : 'menu-item' }}"
+                        :class="collapsed && 'lg:justify-center lg:px-0'" href="{{ route('security.private-key.index') }}">
+                        <x-reicon name="keys" class="menu-item-icon" />
+                        <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Keys & Tokens</span>
+                    </a>
+                </li>
+            @endif
             @if (isCloud() && auth()->user()->isAdmin())
                 <li>
                     <a title="Subscription" {{ wireNavigate() }}
@@ -179,14 +185,16 @@
                     </a>
                 </li>
             @endif
-            <li>
-                <a title="Tags" {{ wireNavigate() }}
-                    class="{{ request()->is('tags*') ? 'menu-item-active menu-item' : 'menu-item' }}"
-                    :class="collapsed && 'lg:justify-center lg:px-0'" href="{{ route('tags.show') }}">
-                    <x-reicon name="tags" class="menu-item-icon" />
-                    <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Tags</span>
-                </a>
-            </li>
+            @if (isInstanceAdmin())
+                <li>
+                    <a title="Tags" {{ wireNavigate() }}
+                        class="{{ request()->is('tags*') ? 'menu-item-active menu-item' : 'menu-item' }}"
+                        :class="collapsed && 'lg:justify-center lg:px-0'" href="{{ route('tags.show') }}">
+                        <x-reicon name="tags" class="menu-item-icon" />
+                        <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Tags</span>
+                    </a>
+                </li>
+            @endif
             @if (isInstanceAdmin())
                 <li>
                     <a title="Settings" {{ wireNavigate() }}
@@ -198,14 +206,32 @@
                 </li>
             @endif
             <li class="flex-1" aria-hidden="true"></li>
-        @endif
-        @if (auth()->id() === 0 && (isCloud() || isDev()))
             <li>
-                <a title="Admin" {{ wireNavigate() }}
-                    class="{{ request()->is('admin') ? 'menu-item-active menu-item' : 'menu-item' }}"
+                <a title="Documentation" target="_blank" rel="noopener noreferrer" href="https://coolify.io/docs"
+                    class="menu-item" :class="collapsed && 'lg:justify-center lg:px-0'">
+                    <x-reicon name="documentation" class="menu-item-icon" />
+                    <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Documentation</span>
+                    <span :class="collapsed && 'lg:hidden'" class="ml-auto flex items-center">
+                        <x-reicon name="external-link" class="size-3 opacity-40" />
+                    </span>
+                </a>
+            </li>
+            <li>
+                <a title="Feedback" target="_blank" rel="noopener noreferrer" href="https://github.com/coollabsio/coolify/issues"
+                    class="menu-item" :class="collapsed && 'lg:justify-center lg:px-0'">
+                    <x-reicon name="feedback" class="menu-item-icon" />
+                    <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Feedback</span>
+                </a>
+            </li>
+
+        @endif
+        @if (auth()->id() === 0 || isInstanceAdmin())
+            <li>
+                <a title="Admin Console" {{ wireNavigate() }}
+                    class="{{ request()->is('admin*') ? 'menu-item-active menu-item' : 'menu-item' }}"
                     :class="collapsed && 'lg:justify-center lg:px-0'" href="{{ route('admin.index') }}">
-                    <x-reicon name="fire" class="menu-item-icon text-pink-500" />
-                    <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Admin</span>
+                    <x-reicon name="shield-check" class="menu-item-icon text-purple-500" />
+                    <span class="menu-item-label font-medium" :class="collapsed && 'lg:hidden'">Admin Console</span>
                 </a>
             </li>
         @endif

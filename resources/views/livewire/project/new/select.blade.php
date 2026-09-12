@@ -1,5 +1,18 @@
 <div class="application-settings-form" x-data x-init="$wire.loadServers">
-    <div x-data="searchResources()">
+    <div x-data="searchResources()" x-init="init()">
+        @if ($isOutOfCapacity)
+            <div class="mb-5 rounded-xl border border-warning/30 bg-warning/10 p-4 text-warning">
+                <div class="flex items-start gap-3">
+                    <x-reicon name="alert-triangle" class="mt-0.5 size-5 shrink-0 text-warning" />
+                    <div>
+                        <h4 class="font-semibold text-warning">Hosting Capacity Operating at Maximum</h4>
+                        <p class="mt-1 text-xs text-neutral-600 dark:text-neutral-300 leading-relaxed">
+                            All hosting clusters are currently operating at peak capacity. To protect existing production workloads and ensure system stability, new deployments are temporarily paused while additional compute nodes are being provisioned. Please try again shortly or contact support.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        @endif
         @if ($current_step === 'type')
             <x-application.settings-section title="Choose a resource" flush>
                 <x-slot:actions>
@@ -20,27 +33,38 @@
                     </div>
 
                     <div class="flex shrink-0 items-center gap-2">
-                        <x-table.dropdown panel-class="w-48!">
-                            <x-slot:trigger><button type="button" class="button"
-                                aria-haspopup="listbox" :aria-expanded="open">
-                                <x-reicon name="filter" class="size-3.5" />
-                                Filter
-                            </button></x-slot:trigger>
-                                <div
-                                    class="px-2 py-1 text-[10px] font-semibold tracking-wide text-neutral-400 uppercase dark:text-fg-faint">
+                        {{-- Resource Type Filter --}}
+                        <div class="relative w-44" @click.outside="typeOpen = false">
+                            <button type="button" class="listbox-trigger"
+                                @click="typeOpen = !typeOpen"
+                                aria-haspopup="listbox"
+                                :aria-expanded="typeOpen"
+                                :title="getResourceTypeLabel()">
+                                <x-reicon name="filter" class="size-3.5 shrink-0 text-neutral-400 dark:text-fg-faint" />
+                                <span class="listbox-trigger-label" x-text="getResourceTypeLabel()"></span>
+                                <svg class="size-3.5 shrink-0 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m8 9 4-4 4 4m0 6-4 4-4-4" />
+                                </svg>
+                            </button>
+                            <div x-show="typeOpen" x-cloak
+                                x-transition.opacity.duration.120ms role="listbox"
+                                class="listbox-panel left-auto! right-0! z-[90]! min-w-44!">
+                                <div class="px-2 py-1.5 text-[10px] font-semibold tracking-wide text-neutral-400 uppercase dark:text-fg-faint">
                                     Resource type
                                 </div>
                                 <template x-for="option in resourceTypeOptions" :key="option.value">
                                     <button type="button" class="listbox-option" role="option"
                                         :aria-selected="resourceType === option.value"
-                                        @click="resourceType = option.value; close()">
+                                        @click="setResourceType(option.value)">
                                         <span x-text="option.label"></span>
                                         <x-reicon name="check-circle" class="size-3.5 text-accent"
                                             x-show="resourceType === option.value" />
                                     </button>
                                 </template>
-                        </x-table.dropdown>
+                            </div>
+                        </div>
 
+                        {{-- Service Category Dropdown --}}
                         <div class="relative w-48" @click.outside="closeCategoryFilter()">
                             <button type="button" class="listbox-trigger"
                                 :disabled="loading || categories.length === 0"
@@ -69,7 +93,7 @@
                                 <div class="max-h-60 overflow-auto p-1">
                                     <button type="button" class="listbox-option" role="option"
                                         :aria-selected="selectedCategory === ''"
-                                        @click="selectedCategory = ''; categorySearch = ''; categoryOpen = false">
+                                        @click="setCategory('')">
                                         <span>All categories</span>
                                         <x-reicon name="check-circle" class="size-3.5 text-accent"
                                             x-show="selectedCategory === ''" />
@@ -79,7 +103,7 @@
                                         :key="category">
                                         <button type="button" class="listbox-option capitalize" role="option"
                                             :aria-selected="selectedCategory === category"
-                                            @click="selectedCategory = category; categorySearch = ''; categoryOpen = false">
+                                            @click="setCategory(category)">
                                             <span class="truncate" x-text="category"></span>
                                             <x-reicon name="check-circle" class="size-3.5 text-accent"
                                                 x-show="selectedCategory === category" />
@@ -88,6 +112,14 @@
                                 </div>
                             </div>
                         </div>
+
+                        {{-- Clear Filters button --}}
+                        <button x-show="hasActiveFilters" x-cloak
+                            type="button" class="button shrink-0 text-[11px] text-neutral-500 hover:text-neutral-800 dark:text-fg-dim dark:hover:text-fg"
+                            @click="clearFilters()" title="Reset all filters">
+                            <x-reicon name="x" class="size-3 text-neutral-400" />
+                            <span>Reset</span>
+                        </button>
                     </div>
                 </div>
             </x-application.settings-section>
@@ -259,7 +291,7 @@
                 <section
                     x-show="(resourceType === 'all' || resourceType === 'services') && filteredServices.length > 0"
                     class="application-settings-section">
-                    <div class="application-settings-section-header" x-init="loadResources">
+                    <div class="application-settings-section-header">
                         <div class="flex items-center gap-2">
                             <x-reicon name="layers" class="size-4 text-neutral-400 dark:text-fg-faint" />
                             <h2>Services</h2>
@@ -359,7 +391,7 @@
                                 label: 'Services'
                             }
                         ],
-                        filterOpen: false,
+                        typeOpen: false,
                         categoryOpen: false,
                         categorySearch: '',
                         selectedCategory: '',
@@ -372,6 +404,102 @@
                         gitBasedApplications: [],
                         dockerBasedApplications: [],
                         databases: [],
+                        init() {
+                            this.initFromUrl();
+                            this.loadResources();
+                        },
+                        initFromUrl() {
+                            try {
+                                const params = new URLSearchParams(window.location.search);
+                                const typeParam = (params.get('type') || '').trim().toLowerCase();
+                                const categoryParam = (params.get('category') || '').trim();
+                                const searchParam = (params.get('search') || '').trim();
+                                const serviceParam = (params.get('service') || '').trim().toLowerCase();
+
+                                if (searchParam) {
+                                    this.search = searchParam;
+                                }
+
+                                if (categoryParam) {
+                                    this.selectedCategory = categoryParam;
+                                }
+
+                                if (serviceParam) {
+                                    this.resourceType = 'services';
+                                    this.search = serviceParam;
+                                }
+
+                                if (typeParam) {
+                                    if (typeParam === 'database' || typeParam === 'databases') {
+                                        this.resourceType = 'databases';
+                                    } else if (typeParam === 'application' || typeParam === 'applications' || typeParam === 'public') {
+                                        this.resourceType = 'applications';
+                                    } else if (typeParam === 'service' || typeParam === 'services') {
+                                        this.resourceType = 'services';
+                                    } else if (['postgresql', 'redis', 'mysql', 'mariadb', 'mongodb', 'keydb', 'dragonfly', 'clickhouse'].includes(typeParam)) {
+                                        this.resourceType = 'databases';
+                                        this.search = typeParam;
+                                    } else if (typeParam.startsWith('one-click-service-')) {
+                                        this.resourceType = 'services';
+                                        this.search = typeParam.replace('one-click-service-', '');
+                                    } else {
+                                        this.search = typeParam;
+                                    }
+                                }
+                            } catch (e) {
+                                console.error('Error parsing URL parameters:', e);
+                            }
+                        },
+                        getResourceTypeLabel() {
+                            const found = this.resourceTypeOptions.find(o => o.value === this.resourceType);
+                            return found ? found.label : 'All resources';
+                        },
+                        setResourceType(val) {
+                            this.resourceType = val;
+                            this.typeOpen = false;
+                            try {
+                                const url = new URL(window.location);
+                                if (val === 'all') {
+                                    url.searchParams.delete('type');
+                                } else {
+                                    url.searchParams.set('type', val);
+                                }
+                                window.history.replaceState({}, '', url);
+                            } catch (e) {}
+                        },
+                        setCategory(category) {
+                            this.selectedCategory = category;
+                            this.categorySearch = '';
+                            this.categoryOpen = false;
+                            try {
+                                const url = new URL(window.location);
+                                if (!category) {
+                                    url.searchParams.delete('category');
+                                } else {
+                                    url.searchParams.set('category', category);
+                                }
+                                window.history.replaceState({}, '', url);
+                            } catch (e) {}
+                        },
+                        clearFilters() {
+                            this.search = '';
+                            this.resourceType = 'all';
+                            this.selectedCategory = '';
+                            this.categorySearch = '';
+                            this.typeOpen = false;
+                            this.categoryOpen = false;
+                            try {
+                                const url = new URL(window.location);
+                                url.searchParams.delete('type');
+                                url.searchParams.delete('category');
+                                url.searchParams.delete('search');
+                                url.searchParams.delete('service');
+                                window.history.replaceState({}, '', url);
+                            } catch (e) {}
+                        },
+                        get hasActiveFilters() {
+                            return this.resourceType !== 'all' || this.selectedCategory !== '' || this.search.trim() !== '';
+                        },
                         closeCategoryFilter(restoreFocus = false) {
                             if (!this.categoryOpen) return;
 
@@ -543,6 +671,7 @@
                             if (searchLower !== '') {
                                 filtered = filtered.filter(item => {
                                     return (item.name?.toLowerCase().includes(searchLower) ||
+                                        item.id?.toLowerCase().includes(searchLower) ||
                                         item.description?.toLowerCase().includes(searchLower) ||
                                         item.slogan?.toLowerCase().includes(searchLower))
                                 });
@@ -551,7 +680,7 @@
                             return isSort ? filtered.sort(sortFn) : filtered;
                         },
                         get filteredGitBasedApplications() {
-                            if (this.gitBasedApplications.length === 0) {
+                            if (this.selectedCategory !== '' || this.gitBasedApplications.length === 0) {
                                 return [];
                             }
                             return [
@@ -559,7 +688,7 @@
                             ].flatMap((items) => this.filterAndSort(items, false));
                         },
                         get filteredDockerBasedApplications() {
-                            if (this.dockerBasedApplications.length === 0) {
+                            if (this.selectedCategory !== '' || this.dockerBasedApplications.length === 0) {
                                 return [];
                             }
                             return [
@@ -568,6 +697,9 @@
                         },
                         get filteredDatabases() {
                             if (this.databases.length === 0) {
+                                return [];
+                            }
+                            if (this.selectedCategory !== '' && this.selectedCategory.toLowerCase() !== 'database' && this.selectedCategory.toLowerCase() !== 'databases') {
                                 return [];
                             }
                             return [

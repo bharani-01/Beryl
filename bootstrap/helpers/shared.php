@@ -544,10 +544,10 @@ function find_destination_for_current_team(?string $uuid): StandaloneDocker|Swar
     $teamId = currentTeam()->id;
 
     return StandaloneDocker::where('uuid', $uuid)
-        ->whereHas('server', fn ($q) => $q->whereTeamId($teamId)->orWhere('id', 0))
+        ->whereHas('server', fn ($q) => $q->whereTeamId($teamId)->orWhere('id', 0)->orWhere('team_id', 0))
         ->first()
         ?? SwarmDocker::where('uuid', $uuid)
-        ->whereHas('server', fn ($q) => $q->whereTeamId($teamId)->orWhere('id', 0))
+        ->whereHas('server', fn ($q) => $q->whereTeamId($teamId)->orWhere('id', 0)->orWhere('team_id', 0))
         ->first();
 }
 
@@ -1350,7 +1350,7 @@ function generateUrl(Server $server, string $random, bool $forceHttps = false): 
     $host = $url->getHost();
     $path = $url->getPath() === '/' ? '' : $url->getPath();
     $scheme = $url->getScheme();
-    if ($forceHttps || $server->id === 0) {
+    if ($forceHttps || $server->id === 0 || str_contains($host, 'trackifyapp.co.in')) {
         $scheme = 'https';
     }
 
@@ -1367,7 +1367,7 @@ function generateFqdn(Server $server, string $random, bool $forceHttps = false, 
     $host = $url->getHost();
     $path = $url->getPath() === '/' ? '' : $url->getPath();
     $scheme = $url->getScheme();
-    if ($forceHttps || $server->id === 0) {
+    if ($forceHttps || $server->id === 0 || str_contains($host, 'trackifyapp.co.in')) {
         $scheme = 'https';
     }
 

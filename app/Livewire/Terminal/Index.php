@@ -18,6 +18,10 @@ class Index extends Component
 
     public function mount()
     {
+        if (! isInstanceAdmin() && auth()->id() !== 0) {
+            abort(403, 'Access to terminal functionality is restricted to instance administrators');
+        }
+
         $this->servers = Server::isReachable()->get()->filter(function ($server) {
             return $server->isTerminalEnabled();
         });

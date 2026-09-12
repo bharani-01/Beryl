@@ -26,6 +26,16 @@ class Configuration extends Component
     {
         $this->syncCurrentRoute();
 
+        $projectUuid = request()->route('project_uuid');
+        if ($projectUuid && currentTeam()?->projects()->where('uuid', $projectUuid)->doesntExist()) {
+            $targetProject = \App\Models\Project::where('uuid', $projectUuid)->first();
+            if ($targetProject && auth()->user()?->teams->contains('id', $targetProject->team_id)) {
+                $team = auth()->user()->teams->firstWhere('id', $targetProject->team_id);
+                refreshSession($team);
+                session(['currentTeam' => $team]);
+            }
+        }
+
         $project = currentTeam()
             ->projects()
             ->select('id', 'uuid', 'name', 'team_id')

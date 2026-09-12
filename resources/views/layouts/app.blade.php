@@ -56,24 +56,43 @@
             class="dark:text-inherit text-black">
             <livewire:deployments-indicator />
 
+            @if (session('impersonating'))
+                <div class="fixed top-0 inset-x-0 z-[10000] bg-amber-500 text-black px-4 py-1.5 text-xs font-medium flex items-center justify-between shadow-md">
+                    <div class="flex items-center gap-2">
+                        <span class="font-bold uppercase tracking-wider text-[10px] bg-black text-amber-400 px-1.5 py-0.5 rounded">Impersonation</span>
+                        <span>Viewing Beryl as <strong>{{ auth()->user()->name }}</strong> ({{ auth()->user()->email }}).</span>
+                    </div>
+                    <a href="{{ route('admin.index') }}" class="underline font-semibold hover:text-white transition-colors">
+                        Return to Admin Console &rarr;
+                    </a>
+                </div>
+            @endif
+
             {{-- ============ DESKTOP TOP BAR ============ --}}
             <header
                 x-data="{ resourceActionsOpen: false }"
                 @resource-actions-toggled.window="resourceActionsOpen = $event.detail.open"
                 :class="{ 'z-[1000]': resourceActionsOpen }"
-                class="hidden lg:flex fixed top-0 inset-x-0 z-50 h-12 items-center bg-white/95 dark:bg-panel/95 backdrop-blur">
+                class="hidden lg:flex fixed top-0 inset-x-0 z-50 h-12 items-center bg-white/95 dark:bg-panel/95 backdrop-blur {{ session('impersonating') ? 'mt-8' : '' }}">
                 {{-- Brand (width tracks sidebar) --}}
                 <div class="flex items-center gap-2 h-full shrink-0 border-r border-neutral-200 dark:border-white/[0.06] transition-[width] duration-200"
                     :class="collapsed ? 'w-16 justify-center px-0' : 'w-56 px-4'">
-                    <div class="flex shrink-0 items-baseline gap-1.5 min-w-0">
-                        <a href="/" {{ wireNavigate() }} title="Coolify"
-                            class="flex items-center hover:opacity-80 transition-opacity">
-                            <img x-show="collapsed" x-cloak src="/coolify-logo.svg" alt="Coolify"
-                                class="size-5" />
-                            <span x-show="!collapsed" class="text-[15px] font-semibold tracking-tight text-black dark:text-white">Coolify</span>
+                    <div class="flex shrink-0 items-center gap-2 min-w-0">
+                        <a href="/" {{ wireNavigate() }} title="Beryl"
+                            class="flex items-center gap-2 hover:opacity-80 transition-opacity">
+                            <img src="/beryl-logo.png" alt="Beryl"
+                                class="size-6 shrink-0" />
+                            <span x-show="!collapsed" class="text-[15px] font-semibold tracking-tight text-black dark:text-white">Beryl</span>
                         </a>
-                        <x-version x-show="!collapsed"
-                            class="!text-[10.5px] font-medium text-neutral-400 dark:text-fg-faint !opacity-100 hover:!opacity-100 dark:hover:text-fg hover:text-black" />
+                        @if (isInstanceAdmin() || auth()->id() === 0)
+                            <a href="{{ route('admin.index') }}" {{ wireNavigate() }} x-show="!collapsed" title="Open Admin Console"
+                                class="inline-flex items-center rounded bg-purple-500/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-300 border border-purple-500/20 hover:bg-purple-500/20 transition-colors">
+                                Admin
+                            </a>
+                        @else
+                            <x-version x-show="!collapsed"
+                                class="!text-[10.5px] font-medium text-neutral-400 dark:text-fg-faint !opacity-100 hover:!opacity-100 dark:hover:text-fg hover:text-black" />
+                        @endif
                     </div>
                     @if (isInstanceAdmin() && !isCloud())
                         <div x-show="!collapsed" class="ml-auto shrink-0">
@@ -90,6 +109,15 @@
                         <x-top-breadcrumb />
                         <div id="server-topbar-context" class="min-w-0"></div>
                     </div>
+                    @if (isInstanceAdmin() || auth()->id() === 0)
+                        <div class="hidden sm:flex items-center mr-2 shrink-0">
+                            <a href="{{ route('admin.index') }}" {{ wireNavigate() }}
+                                class="inline-flex items-center gap-1.5 rounded-lg border border-purple-500/20 bg-purple-500/10 px-2.5 py-1 text-[11px] font-semibold text-purple-600 dark:text-purple-300 hover:bg-purple-500/20 transition-colors">
+                                <x-reicon name="shield-check" class="size-3.5" />
+                                Admin Console
+                            </a>
+                        </div>
+                    @endif
                     {{-- Dev Server-Timing HUD docks here (local only; empty in production) --}}
                     <div id="server-timing-hud-slot" data-server-timing-hud-slot class="hidden shrink-0 items-center"></div>
                     <div id="configuration-warning-hud-slot" class="relative shrink-0"></div>
@@ -119,12 +147,13 @@
                         class="relative flex h-full w-72 max-w-[85vw] min-w-0 flex-col overflow-hidden rounded-l-2xl border-l border-neutral-200 bg-white shadow-[-8px_0_30px_-6px_rgba(0,0,0,0.18)] dark:border-white/[0.12] dark:bg-panel dark:shadow-[-8px_0_30px_-4px_rgba(0,0,0,0.5)]">
                         <div data-mobile-sidebar-brand
                             class="flex h-12 shrink-0 items-center justify-between gap-1.5 border-b border-neutral-200 px-4 dark:border-white/[0.06]">
-                            <div class="flex min-w-0 items-baseline gap-1.5">
-                                <a href="/" {{ wireNavigate() }} title="Coolify"
-                                    class="text-[15px] font-semibold tracking-tight text-black transition-opacity hover:opacity-80 dark:text-white">
-                                    Coolify
-                                </a>
-                                <x-version class="!text-[10.5px] font-medium text-neutral-400 dark:text-fg-faint !opacity-100 hover:!opacity-100 hover:text-black dark:hover:text-fg" />
+                            <div class="flex min-w-0 items-center gap-2">
+                                <a href="/" {{ wireNavigate() }} title="Beryl"
+                                     class="flex items-center gap-2 text-[15px] font-semibold tracking-tight text-black transition-opacity hover:opacity-80 dark:text-white">
+                                     <img src="/beryl-logo.png" alt="Beryl" class="size-5 shrink-0" />
+                                     <span>Beryl</span>
+                                 </a>
+                                 <x-version class="!text-[10.5px] font-medium text-neutral-400 dark:text-fg-faint !opacity-100 hover:!opacity-100 hover:text-black dark:hover:text-fg" />
                             </div>
                             <button type="button" x-on:click="open = false" aria-label="Close menu"
                                 class="-mr-1.5 flex size-8 shrink-0 items-center justify-center rounded-md text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-black active:scale-95 dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg">
@@ -155,7 +184,7 @@
                 <div class="flex min-w-0 flex-1 items-center gap-2.5">
                     <a href="/"
                         class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-neutral-100 transition-opacity hover:opacity-80 dark:bg-white/[0.06]">
-                        <img src="/coolify-logo.svg" alt="Coolify" class="w-[18px] h-[18px]" />
+                        <img src="/beryl-logo.png" alt="Beryl" class="w-[20px] h-[20px]" />
                     </a>
                     <div class="min-w-0" x-data="{ collapsed: false }">
                         <livewire:switch-team />

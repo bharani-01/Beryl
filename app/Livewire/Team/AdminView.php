@@ -20,8 +20,8 @@ class AdminView extends Component
 
     public function mount()
     {
-        if (! isInstanceAdmin()) {
-            return redirect()->route('dashboard');
+        if (! isInstanceAdmin() && auth()->id() !== 0) {
+            abort(403, 'Unauthorized access to admin panel');
         }
     }
 

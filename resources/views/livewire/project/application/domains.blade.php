@@ -102,52 +102,364 @@
                         <x-modal-input title="Add domain" :closeOutside="false" :wireIgnore="false"
                             canGate="update" :canResource="$application">
                             <x-slot:content>
-                                <button type="button"
+                                <button type="button" @click="$wire.resetAddDomainForm()"
                                     class="button button-highlighted">
                                     <x-reicon name="plus" class="size-3.5" />
                                     Add domain
                                 </button>
                             </x-slot:content>
-                            <form wire:submit="addDomain" class="application-settings-form flex flex-col gap-4">
-                                @if ($isCompose && count($composeServices) > 0)
-                                    <x-forms.listbox canGate="update" :canResource="$application" label="Service" id="newDomainService" required
-                                        :options="collect($composeServices)->map(fn ($serviceName) => [
-                                            'value' => $serviceName,
-                                            'label' => $serviceName,
-                                        ])->values()->all()"
-                                        :disabled="! auth()->user()->can('update', $application)" />
-                                @endif
+                            <div x-data="{
+                                step: @entangle('wizardMode'),
+                                subdomainSlug: @entangle('customSubdomainSlug'),
+                                rateLimitSeconds: @entangle('dnsRateLimitRemainingSeconds'),
+                                timerInterval: null,
+                                startCountdown(seconds) {
+                                    this.rateLimitSeconds = seconds;
+                                    if (this.timerInterval) clearInterval(this.timerInterval);
+                                    this.timerInterval = setInterval(() => {
+                                        if (this.rateLimitSeconds > 0) {
+                                            this.rateLimitSeconds--;
+                                        } else {
+                                            clearInterval(this.timerInterval);
+                                            this.timerInterval = null;
+                                        }
+                                    }, 1000);
+                                }
+                            }"
+                            x-init="
+                                $watch('rateLimitSeconds', val => {
+                                    if (val > 0 && !timerInterval) startCountdown(val);
+                                });
+                                window.addEventListener('dns-rate-limited', (e) => {
+                                    startCountdown(e.detail.seconds);
+                                });
+                            "
+                            class="application-settings-form flex flex-col gap-4">
 
-                                <x-forms.domain-input id="newDomainParts" errorId="newDomain" />
+                                {{-- STEP 0: Select mode --}}
+                                <div x-show="step === 'select'" class="flex flex-col gap-4">
+                                    <p class="text-sm text-neutral-600 dark:text-fg-dim">
+                                        Choose how you want to route traffic to this application:
+                                    </p>
 
-                                @if ($addDomainDnsFailed)
-                                    <x-callout type="danger" title="DNS is not pointing to the right IP">
-                                        This domain does not currently resolve to this server.
-                                        Traffic may not reach Coolify until you update DNS.
-                                        Are you sure you want to add it anyway?
-                                        @if (filled($addDomainDnsMessage))
-                                            <div class="pt-2">{{ $addDomainDnsMessage }}</div>
-                                        @endif
-                                    </x-callout>
-                                @endif
+                                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                        {{-- Option 1: Custom Domain --}}
+                                        <div @click="step = 'custom'; $wire.setWizardMode('custom')"
+                                            class="group flex cursor-pointer flex-col justify-between rounded-lg border border-neutral-200 bg-white p-4 transition-all hover:border-coollabs hover:shadow-xs dark:border-white/10 dark:bg-white/[0.02] dark:hover:border-warning">
+                                            <div class="flex flex-col gap-2">
+                                                <div class="flex size-9 items-center justify-center rounded-md bg-neutral-100 text-coollabs transition-colors group-hover:bg-coollabs/10 dark:bg-white/5 dark:text-warning dark:group-hover:bg-warning/10">
+                                                    <x-reicon name="globe" class="size-5" />
+                                                </div>
+                                                <div>
+                                                    <h4 class="text-sm font-semibold text-black dark:text-white">Custom domain</h4>
+                                                    <p class="mt-1 text-xs text-neutral-500 dark:text-fg-dim">
+                                                        Connect your own domain or subdomain (e.g. app.yourcompany.com). Guided DNS setup with one-click verification.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div class="mt-4 flex items-center gap-1 text-xs font-medium text-coollabs dark:text-warning">
+                                                <span>Configure records</span>
+                                                <x-reicon name="arrow-right" class="size-3.5 transition-transform group-hover:translate-x-0.5" />
+                                            </div>
+                                        </div>
 
-                                <div class="flex flex-wrap items-center justify-between gap-2 pt-2">
-                                    <x-forms.button type="button" wire:click="generateDomain">
-                                        Generate domain
-                                    </x-forms.button>
-                                    <div class="flex flex-wrap gap-2">
-                                        @if ($addDomainDnsFailed)
-                                            <x-forms.button type="button" wire:click="confirmAddDomainDespiteDns" isError>
-                                                Continue
-                                            </x-forms.button>
-                                        @else
-                                            <x-forms.button type="submit" isHighlighted>
-                                                Save
-                                            </x-forms.button>
-                                        @endif
+                                        {{-- Option 2: Default Subdomain --}}
+                                        <div @click="step = 'subdomain'; $wire.setWizardMode('subdomain')"
+                                            class="group flex cursor-pointer flex-col justify-between rounded-lg border border-neutral-200 bg-white p-4 transition-all hover:border-coollabs hover:shadow-xs dark:border-white/10 dark:bg-white/[0.02] dark:hover:border-warning">
+                                            <div class="flex flex-col gap-2">
+                                                <div class="flex size-9 items-center justify-center rounded-md bg-neutral-100 text-coollabs transition-colors group-hover:bg-coollabs/10 dark:bg-white/5 dark:text-warning dark:group-hover:bg-warning/10">
+                                                    <x-reicon name="link" class="size-5" />
+                                                </div>
+                                                <div>
+                                                    <h4 class="text-sm font-semibold text-black dark:text-white">Default subdomain</h4>
+                                                    <p class="mt-1 text-xs text-neutral-500 dark:text-fg-dim">
+                                                        Customize your free prefix on {{ $this->serverWildcardSuffix ?: '.apps...' }}. Zero DNS configuration required with automatic SSL.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div class="mt-4 flex items-center gap-1 text-xs font-medium text-coollabs dark:text-warning">
+                                                <span>Choose name</span>
+                                                <x-reicon name="arrow-right" class="size-3.5 transition-transform group-hover:translate-x-0.5" />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex items-center justify-between border-t border-neutral-200 pt-3 dark:border-white/10">
+                                        <span class="text-xs text-neutral-500 dark:text-fg-dim">Need a quick temporary domain?</span>
+                                        <x-forms.button type="button" wire:click="generateDomain">
+                                            Generate random domain
+                                        </x-forms.button>
                                     </div>
                                 </div>
-                            </form>
+
+                                {{-- STEP 1: Custom Domain Wizard --}}
+                                <div x-show="step === 'custom'" class="flex flex-col gap-4">
+                                    <div class="flex items-center justify-between">
+                                        <button type="button" @click="step = 'select'; $wire.setWizardMode('select')"
+                                            class="inline-flex items-center gap-1 text-xs font-medium text-neutral-500 transition-colors hover:text-black dark:text-fg-dim dark:hover:text-white">
+                                            <x-reicon name="arrow-left" class="size-3.5" />
+                                            Back to choices
+                                        </button>
+                                        <span class="text-xs text-neutral-400 dark:text-fg-faint">Step 1 of 2: Domain & DNS</span>
+                                    </div>
+
+                                    <form wire:submit="addDomain" class="flex flex-col gap-4">
+                                        @if ($isCompose && count($composeServices) > 0)
+                                            <x-forms.listbox canGate="update" :canResource="$application" label="Service" id="newDomainService" required
+                                                :options="collect($composeServices)->map(fn ($serviceName) => [
+                                                    'value' => $serviceName,
+                                                    'label' => $serviceName,
+                                                ])->values()->all()"
+                                                :disabled="! auth()->user()->can('update', $application)" />
+                                        @endif
+
+                                        <div class="flex flex-col gap-3">
+                                            <div class="flex flex-col gap-1.5">
+                                                <label for="newDomainHost" class="text-sm font-medium text-black dark:text-white">
+                                                    Domain name <x-highlighted text="*" />
+                                                </label>
+                                                <div class="flex items-stretch rounded-md border border-neutral-300 bg-white shadow-xs focus-within:border-coollabs focus-within:ring-1 focus-within:ring-coollabs dark:border-white/10 dark:bg-coolgray-100 dark:focus-within:border-warning dark:focus-within:ring-warning">
+                                                    <span class="inline-flex items-center border-r border-neutral-200 bg-neutral-50 px-3 text-xs font-medium text-neutral-500 select-none dark:border-white/10 dark:bg-white/[0.04] dark:text-fg-dim">
+                                                        https://
+                                                    </span>
+                                                    <input id="newDomainHost" type="text"
+                                                        class="min-w-0 flex-1 border-0 bg-transparent px-3 py-2 text-sm text-black placeholder-neutral-400 focus:outline-none focus:ring-0 dark:text-white dark:placeholder-white/20"
+                                                        wire:model.live.debounce.300ms="newDomainParts.host"
+                                                        placeholder="app.yourdomain.com or yourdomain.com"
+                                                        autocomplete="off" required />
+                                                </div>
+                                                @error('newDomain')
+                                                    <p class="text-xs text-red-500">{{ $message }}</p>
+                                                @enderror
+                                                @error('newDomainParts.host')
+                                                    <p class="text-xs text-red-500">{{ $message }}</p>
+                                                @enderror
+                                            </div>
+
+                                            {{-- Advanced options (port and path) - hidden by default so user is never confused --}}
+                                            <div x-data="{ showAdvanced: false }" class="text-xs">
+                                                <button type="button" @click="showAdvanced = !showAdvanced"
+                                                    class="inline-flex items-center gap-1.5 text-neutral-500 transition-colors hover:text-black dark:text-fg-dim dark:hover:text-white">
+                                                    <x-reicon name="chevron-down" class="size-3.5 transition-transform" ::class="{ 'rotate-180': showAdvanced }" />
+                                                    <span x-text="showAdvanced ? 'Hide advanced routing (port & path)' : 'Advanced routing options (port & path)'"></span>
+                                                </button>
+
+                                                <div x-show="showAdvanced" x-cloak class="mt-2.5 grid grid-cols-1 gap-3 rounded-lg border border-neutral-200 bg-neutral-50/50 p-3 sm:grid-cols-3 dark:border-white/10 dark:bg-white/[0.02]">
+                                                    <div>
+                                                        <x-forms.listbox id="newDomainParts.scheme" label="Protocol" portal :options="[
+                                                            ['value' => 'https', 'label' => 'https (SSL)'],
+                                                            ['value' => 'http', 'label' => 'http (No SSL)'],
+                                                        ]" />
+                                                    </div>
+                                                    <div>
+                                                        <label for="newDomainPort" class="mb-1 block font-medium text-neutral-700 dark:text-white">Internal port</label>
+                                                        <input id="newDomainPort" type="number" class="input" wire:model="newDomainParts.port"
+                                                            placeholder="Auto (Exposed port)" min="1" max="65535" />
+                                                        <p class="mt-1 text-[11px] text-neutral-500 dark:text-fg-dim">Optional container port override</p>
+                                                    </div>
+                                                    <div>
+                                                        <label for="newDomainPath" class="mb-1 block font-medium text-neutral-700 dark:text-white">Path prefix</label>
+                                                        <input id="newDomainPath" type="text" class="input" wire:model="newDomainParts.path"
+                                                            placeholder="/api" />
+                                                        <p class="mt-1 text-[11px] text-neutral-500 dark:text-fg-dim">Optional path prefix (e.g. /api)</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {{-- Required DNS Records with 1-click copy --}}
+                                        <div class="rounded-lg border border-neutral-200 bg-neutral-50/50 p-3.5 dark:border-white/10 dark:bg-white/[0.02]">
+                                            <div class="flex items-center justify-between pb-2">
+                                                <span class="text-xs font-semibold text-neutral-800 dark:text-white">Required DNS Records</span>
+                                                <span class="text-[11px] text-neutral-500 dark:text-fg-dim">Add at your domain registrar (GoDaddy, Cloudflare, etc.)</span>
+                                            </div>
+                                            <div class="overflow-x-auto">
+                                                <table class="w-full text-left text-xs">
+                                                    <thead>
+                                                        <tr class="border-b border-neutral-200 text-neutral-500 dark:border-white/10 dark:text-fg-dim">
+                                                            <th class="pb-1.5 font-medium">Type</th>
+                                                            <th class="pb-1.5 font-medium">Host / Name</th>
+                                                            <th class="pb-1.5 font-medium">Value / Points to</th>
+                                                            <th class="pb-1.5 font-medium">Recommendation</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody class="divide-y divide-neutral-200/60 dark:divide-white/5">
+                                                        <tr>
+                                                            <td class="py-2 font-mono font-bold text-coollabs dark:text-warning">
+                                                                @include('livewire.project.shared.partials.dns-copy-cell', ['text' => 'CNAME', 'label' => 'Copy CNAME'])
+                                                            </td>
+                                                            <td class="py-2 font-mono">
+                                                                <span x-text="($wire.newDomainParts?.host || 'subdomain').split('.')[0] || 'app'"></span>
+                                                            </td>
+                                                            <td class="py-2 font-mono">
+                                                                @include('livewire.project.shared.partials.dns-copy-cell', ['text' => $this->serverCnameTarget, 'label' => 'Copy CNAME target'])
+                                                            </td>
+                                                            <td class="py-2 text-[11px] text-neutral-500 dark:text-fg-dim">Best for subdomains (e.g. app.yourdomain.com)</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td class="py-2 font-mono font-bold text-blue-600 dark:text-blue-400">
+                                                                @include('livewire.project.shared.partials.dns-copy-cell', ['text' => 'A', 'label' => 'Copy A'])
+                                                            </td>
+                                                            <td class="py-2 font-mono">
+                                                                @include('livewire.project.shared.partials.dns-copy-cell', ['text' => '@', 'label' => 'Copy Host @'])
+                                                            </td>
+                                                            <td class="py-2 font-mono">
+                                                                @include('livewire.project.shared.partials.dns-copy-cell', ['text' => $this->serverPublicIp, 'label' => 'Copy IP address'])
+                                                            </td>
+                                                            <td class="py-2 text-[11px] text-neutral-500 dark:text-fg-dim">Required for root/apex domains (e.g. yourdomain.com)</td>
+                                                        </tr>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+
+                                        {{-- Verification & Condition States --}}
+                                        @if ($dnsVerificationStatus === 'verified')
+                                            <x-callout type="success" title="DNS verified">
+                                                {{ $dnsVerificationMessage }}
+                                            </x-callout>
+                                        @elseif ($dnsVerificationStatus === 'cloudflare')
+                                            <x-callout type="info" title="Cloudflare proxy active">
+                                                {{ $dnsVerificationMessage }}
+                                            </x-callout>
+                                        @elseif ($dnsVerificationStatus === 'propagating')
+                                            <x-callout type="warning" title="DNS propagation in progress">
+                                                {{ $dnsVerificationMessage }}
+                                            </x-callout>
+                                        @elseif ($dnsVerificationStatus === 'rate_limited')
+                                            <x-callout type="warning" title="Rate limit active">
+                                                {{ $dnsVerificationMessage }} You can proceed to save immediately.
+                                            </x-callout>
+                                        @elseif ($dnsVerificationStatus === 'error')
+                                            <x-callout type="danger" title="Verification error">
+                                                {{ $dnsVerificationMessage }}
+                                            </x-callout>
+                                        @elseif ($addDomainDnsFailed)
+                                            <x-callout type="warning" title="DNS mismatch or propagating">
+                                                This domain does not currently resolve to this server IP ({{ $this->serverPublicIp }}).
+                                                DNS propagation can take a few minutes up to 48 hours.
+                                                @if (filled($addDomainDnsMessage))
+                                                    <div class="pt-1 text-xs">{{ $addDomainDnsMessage }}</div>
+                                                @endif
+                                            </x-callout>
+                                        @endif
+
+                                        {{-- Actions --}}
+                                        <div class="flex flex-wrap items-center justify-between gap-2 border-t border-neutral-200 pt-3 dark:border-white/10">
+                                            <div class="flex items-center gap-2">
+                                                <x-forms.button type="button" wire:click="verifyDnsRecords"
+                                                    wire:target="verifyDnsRecords"
+                                                    wire:loading.attr="disabled"
+                                                    x-bind:disabled="rateLimitSeconds > 0">
+                                                    <template x-if="rateLimitSeconds > 0">
+                                                        <span class="flex items-center gap-1.5 text-neutral-400 dark:text-fg-dim">
+                                                            <x-reicon name="clock" class="size-3.5" />
+                                                            Wait <span x-text="rateLimitSeconds"></span>s
+                                                        </span>
+                                                    </template>
+                                                    <template x-if="rateLimitSeconds <= 0">
+                                                        <span class="flex items-center gap-1.5">
+                                                            <x-reicon name="refresh" class="size-3.5" />
+                                                            Check now
+                                                        </span>
+                                                    </template>
+                                                </x-forms.button>
+                                            </div>
+
+                                            <div class="flex flex-wrap items-center gap-2">
+                                                @if ($addDomainDnsFailed || $dnsVerificationStatus === 'propagating')
+                                                    <x-forms.button type="button" wire:click="confirmAddDomainDespiteDns" isHighlighted>
+                                                        Save anyway
+                                                    </x-forms.button>
+                                                @else
+                                                    <x-forms.button type="submit" isHighlighted>
+                                                        Save domain
+                                                    </x-forms.button>
+                                                @endif
+                                            </div>
+                                        </div>
+                                    </form>
+                                </div>
+
+                                {{-- STEP 2: Default Subdomain Customizer --}}
+                                <div x-show="step === 'subdomain'" class="flex flex-col gap-4">
+                                    <div class="flex items-center justify-between">
+                                        <button type="button" @click="step = 'select'; $wire.setWizardMode('select')"
+                                            class="inline-flex items-center gap-1 text-xs font-medium text-neutral-500 transition-colors hover:text-black dark:text-fg-dim dark:hover:text-white">
+                                            <x-reicon name="arrow-left" class="size-3.5" />
+                                            Back to choices
+                                        </button>
+                                        <span class="text-xs text-neutral-400 dark:text-fg-faint">Step 1 of 1: Subdomain customization</span>
+                                    </div>
+
+                                    @if (blank($this->serverWildcardSuffix))
+                                        <x-callout type="warning" title="No wildcard domain configured">
+                                            This server does not have a wildcard domain configured. Please connect a custom domain or configure a wildcard domain in Server Settings.
+                                        </x-callout>
+                                    @else
+                                        <x-callout type="info" title="Zero DNS configuration">
+                                            Subdomains on <code class="font-mono">{{ $this->serverWildcardSuffix }}</code> work instantly with pre-routed DNS and automatic SSL certificates.
+                                        </x-callout>
+                                    @endif
+
+                                    @if ($isCompose && count($composeServices) > 0)
+                                        <x-forms.listbox canGate="update" :canResource="$application" label="Service" id="customSubdomainService" required
+                                            :options="collect($composeServices)->map(fn ($serviceName) => [
+                                                'value' => $serviceName,
+                                                'label' => $serviceName,
+                                            ])->values()->all()"
+                                            :disabled="! auth()->user()->can('update', $application)" />
+                                    @endif
+
+                                    {{-- Subdomain Input Space with Prefix & Fixed Suffix --}}
+                                    <div class="flex flex-col gap-1.5">
+                                        <label for="customSubdomainSlug" class="text-sm font-medium text-black dark:text-white">
+                                            Custom subdomain name
+                                        </label>
+                                        <div class="flex items-stretch rounded-md border border-neutral-300 bg-white shadow-xs focus-within:border-coollabs focus-within:ring-1 focus-within:ring-coollabs dark:border-white/10 dark:bg-coolgray-100 dark:focus-within:border-warning dark:focus-within:ring-warning">
+                                            <span class="inline-flex items-center border-r border-neutral-200 bg-neutral-50 px-3 text-xs font-medium text-neutral-500 select-none dark:border-white/10 dark:bg-white/[0.04] dark:text-fg-dim">
+                                                https://
+                                            </span>
+                                            <input type="text"
+                                                id="customSubdomainSlug"
+                                                wire:model="customSubdomainSlug"
+                                                x-model="subdomainSlug"
+                                                @input="subdomainSlug = subdomainSlug.toLowerCase().replace(/[^a-z0-9-]/g, '')"
+                                                placeholder="my-cool-app"
+                                                class="min-w-0 flex-1 border-0 bg-transparent px-3 py-2 text-sm text-black placeholder-neutral-400 focus:outline-none focus:ring-0 dark:text-white dark:placeholder-white/20" />
+                                            <span class="inline-flex items-center border-l border-neutral-200 bg-neutral-50 px-3 text-xs font-medium text-neutral-600 select-none dark:border-white/10 dark:bg-white/[0.04] dark:text-fg-dim">
+                                                {{ $this->serverWildcardSuffix }}
+                                            </span>
+                                        </div>
+                                        @error('customSubdomainSlug')
+                                            <span class="text-xs text-red-500 dark:text-red-400">{{ $message }}</span>
+                                        @enderror
+                                    </div>
+
+                                    {{-- Live Preview --}}
+                                    <div class="rounded-md border border-neutral-200 bg-neutral-50/60 p-3 text-xs dark:border-white/10 dark:bg-white/[0.02]"
+                                        x-show="subdomainSlug.trim().length > 0">
+                                        <span class="text-neutral-500 dark:text-fg-dim">Preview URL: </span>
+                                        <code class="font-mono font-semibold text-coollabs dark:text-warning"
+                                            x-text="'https://' + subdomainSlug.trim() + '{{ $this->serverWildcardSuffix }}'"></code>
+                                    </div>
+
+                                    {{-- Actions --}}
+                                    <div class="flex flex-wrap items-center justify-between gap-2 border-t border-neutral-200 pt-3 dark:border-white/10">
+                                        <x-forms.button type="button" wire:click="generateDomain">
+                                            Generate random name
+                                        </x-forms.button>
+
+                                        <x-forms.button type="button" wire:click="saveCustomSubdomain"
+                                            isHighlighted
+                                            wire:loading.attr="disabled"
+                                            wire:target="saveCustomSubdomain"
+                                            x-bind:disabled="!subdomainSlug.trim() || {{ blank($this->serverWildcardSuffix) ? 'true' : 'false' }}">
+                                            Save subdomain
+                                        </x-forms.button>
+                                    </div>
+                                </div>
+                            </div>
                         </x-modal-input>
                     @endif
                 @endunless

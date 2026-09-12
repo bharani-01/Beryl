@@ -500,5 +500,5 @@ Route::any('/{any}', function () {
         return redirect(RouteServiceProvider::HOME);
     }
 
-    return redirect()->route('login');
+    return redirect()->guest(route('login'));
 })->where('any', '.*');

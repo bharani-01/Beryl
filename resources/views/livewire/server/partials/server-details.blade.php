@@ -5,9 +5,11 @@
         'Operating system' => $meta['os'] ?? 'N/A',
         'Architecture' => $meta['arch'] ?? 'N/A',
         'Kernel' => $meta['kernel'] ?? 'N/A',
-        'CPU cores' => $meta['cpus'] ?? 'N/A',
-        'Memory' => isset($meta['memory_bytes']) ? round($meta['memory_bytes'] / 1073741824, 1) . ' GB' : 'N/A',
-        'Docker version' => $server->dockerVersion() ?? 'N/A',
+        'Memory' => isset($meta['memory_bytes'])
+            ? (!empty($meta['swap_bytes'])
+                ? round(($meta['memory_bytes'] + $meta['swap_bytes']) / 1073741824, 1) . ' GB (' . round($meta['memory_bytes'] / 1073741824, 1) . ' GB RAM + ' . round($meta['swap_bytes'] / 1073741824, 1) . ' GB Swap)'
+                : round($meta['memory_bytes'] / 1073741824, 1) . ' GB')
+            : 'N/A',
         'Compose version' => $server->composeVersion() ?? 'N/A',
         'Up since' => $meta['uptime_since'] ?? 'N/A',
     ] as $detailLabel => $detailValue)

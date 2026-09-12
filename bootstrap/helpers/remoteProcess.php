@@ -38,7 +38,7 @@ function remote_process(
 
     if (Auth::check()) {
         $teams = Auth::user()->teams->pluck('id');
-        if (! $teams->contains($server->team_id) && ! $teams->contains(0) && (int) $server->id !== 0) {
+        if (! $teams->contains($server->team_id) && ! $teams->contains(0) && (int) $server->id !== 0 && (int) $server->team_id !== 0) {
             throw new Exception('User is not part of the team that owns this server');
         }
     }

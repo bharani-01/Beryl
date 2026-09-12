@@ -99,7 +99,7 @@ class ActivityMonitor extends Component
         $serverUuid = data_get($activity, 'properties.server_uuid');
         if ($serverUuid) {
             $server = Server::where('uuid', $serverUuid)->first();
-            if ($server && (int) $server->team_id !== (int) $currentTeamId && (int) $server->id !== 0 && (int) $currentTeamId !== 0) {
+            if ($server && (int) $server->team_id !== (int) $currentTeamId && (int) $server->id !== 0 && (int) $server->team_id !== 0 && (int) $currentTeamId !== 0) {
                 $this->activity = null;
 
                 return;

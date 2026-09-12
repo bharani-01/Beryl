@@ -54,6 +54,8 @@ class Select extends Component
 
     public ?string $existingPostgresqlUrl = null;
 
+    public bool $isOutOfCapacity = false;
+
     protected $queryString = [
         'server_id',
         'type' => ['except' => ''],
@@ -82,17 +84,16 @@ class Select extends Component
                 $this->type = $queryType;
                 $this->server_id = $queryServerId;
                 $this->destination_uuid = $queryDestination;
-                $this->server = Server::where('id', $queryServerId)->where(fn ($q) => $q->whereTeamId(currentTeam()->id)->orWhere('id', 0))->first();
+                $this->server = Server::where('id', $queryServerId)->where(fn ($q) => $q->whereTeamId(currentTeam()->id)->orWhere('id', 0)->orWhere('team_id', 0))->first();
                 $this->current_step = 'select-postgresql-type';
             } elseif (currentTeam()?->id !== 0) {
-                $server0 = Server::find(0);
-                if ($server0) {
-                    $this->server = $server0;
-                    $this->server_id = (string) $server0->id;
-                    $docker = $server0->standaloneDockers->first() ?? $server0->destinations()->first();
-                    if ($docker) {
-                        $this->destination_uuid = $docker->uuid;
-                    }
+                $optimal = \App\Actions\Server\ResolveOptimalHostingServer::run();
+                if ($optimal && isset($optimal['server'], $optimal['destination'])) {
+                    $this->server = $optimal['server'];
+                    $this->server_id = (string) $optimal['server']->id;
+                    $this->destination_uuid = $optimal['destination']->uuid;
+                } else {
+                    $this->isOutOfCapacity = true;
                 }
             }
         } catch (\Exception $e) {
@@ -371,18 +372,21 @@ class Select extends Component
         $this->loading = true;
         $this->type = $type;
 
-        // For managed users (non-root), automatically bind to managed Server 0 and Destination 0
+        // For managed users (non-root), dynamically resolve optimal hosting server based on real-time load
         if (currentTeam()?->id !== 0) {
-            $server = Server::find(0);
-            if ($server) {
-                $this->server_id = (string) $server->id;
-                $this->server = $server;
-                $docker = $server->standaloneDockers->first() ?? $server->destinations()->first();
-                if ($docker) {
-                    $this->destination_uuid = $docker->uuid;
+            $optimal = \App\Actions\Server\ResolveOptimalHostingServer::run();
+            if ($optimal && isset($optimal['server'], $optimal['destination'])) {
+                $this->server_id = (string) $optimal['server']->id;
+                $this->server = $optimal['server'];
+                $this->destination_uuid = $optimal['destination']->uuid;
 
-                    return $this->whatToDoNext();
-                }
+                return $this->whatToDoNext();
+            } else {
+                $this->isOutOfCapacity = true;
+                $this->loading = false;
+                $this->dispatch('error', 'All hosting servers are currently operating at maximum capacity. New deployments are temporarily paused. Please try again shortly.');
+
+                return;
             }
         }
 

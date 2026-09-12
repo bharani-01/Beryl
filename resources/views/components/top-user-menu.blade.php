@@ -57,10 +57,30 @@
             'origin-top-right' => ! $sidebar,
         ])>
         <div class="min-w-0 px-2 py-1.5">
-            <div class="truncate text-[13px] font-semibold text-black dark:text-fg">{{ $userName }}</div>
-            <div class="truncate text-[11px] text-neutral-500 dark:text-fg-faint">{{ $userEmail }}</div>
+            <div class="flex items-center justify-between gap-1.5">
+                <div class="truncate text-[13px] font-semibold text-black dark:text-fg">{{ $userName }}</div>
+                @if (isInstanceAdmin() || auth()->id() === 0)
+                    <span class="inline-flex items-center rounded-full bg-purple-500/10 px-1.5 py-0.5 text-[9.5px] font-semibold text-purple-600 dark:text-purple-300 border border-purple-500/20">
+                        Admin
+                    </span>
+                @else
+                    <span class="inline-flex items-center rounded-full bg-neutral-200/60 dark:bg-white/10 px-1.5 py-0.5 text-[9.5px] font-medium text-neutral-600 dark:text-neutral-300">
+                        {{ auth()->user()?->isOwner() ? 'Owner' : (auth()->user()?->isAdmin() ? 'Admin' : 'Member') }}
+                    </span>
+                @endif
+            </div>
+            <div class="truncate text-[11px] text-neutral-500 dark:text-fg-faint mt-0.5">{{ $userEmail }}</div>
         </div>
         <div class="my-1 h-px bg-neutral-200 dark:bg-white/[0.07]"></div>
+
+        @if (isInstanceAdmin() || auth()->id() === 0)
+            <a href="{{ route('admin.index') }}" {{ wireNavigate() }} class="listbox-option text-purple-600! dark:text-purple-400!">
+                <span class="flex items-center gap-2">
+                    <x-reicon name="shield-check" class="size-4 text-purple-500" />
+                    Admin Console
+                </span>
+            </a>
+        @endif
 
         <a href="{{ route('profile') }}" {{ wireNavigate() }} class="listbox-option">
             <span class="flex items-center gap-2">

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Admin;
 
+use App\Models\Server;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Support\Collection;
@@ -10,9 +11,19 @@ use Livewire\Component;
 
 class Index extends Component
 {
-    public int $activeSubscribers;
+    public int $activeSubscribers = 0;
 
-    public int $inactiveSubscribers;
+    public int $inactiveSubscribers = 0;
+
+    public int $totalServers = 0;
+
+    public int $activeServers = 0;
+
+    public int $totalUsers = 0;
+
+    public int $totalTeams = 0;
+
+    public Collection $servers;
 
     public Collection $foundUsers;
 
@@ -20,11 +31,40 @@ class Index extends Component
 
     public function mount()
     {
-        if (! isCloud() && ! isDev()) {
-            abort(403);
-        }
         $this->authorizeAdminAccess();
+        $this->loadFleetStats();
         $this->getSubscribers();
+        $this->loadUsers();
+    }
+
+    public function loadFleetStats(): void
+    {
+        $this->servers = Server::where(function ($query) {
+            $query->where('team_id', 0)->orWhere('id', 0);
+        })
+            ->with(['settings'])
+            ->orderBy('id')
+            ->get();
+
+        $this->totalServers = $this->servers->count();
+        $this->activeServers = $this->servers->filter(function ($server) {
+            return (bool) data_get($server, 'settings.is_reachable', false);
+        })->count();
+
+        $this->totalUsers = User::count();
+        $this->totalTeams = Team::where('id', '!=', 0)->count();
+    }
+
+    public function loadUsers(): void
+    {
+        if ($this->search !== '') {
+            $this->foundUsers = User::where(function ($query) {
+                $query->where('name', 'like', "%{$this->search}%")
+                    ->orWhere('email', 'like', "%{$this->search}%");
+            })->with('teams')->latest()->take(50)->get();
+        } else {
+            $this->foundUsers = User::with('teams')->latest()->take(30)->get();
+        }
     }
 
     public function back()
@@ -44,18 +84,13 @@ class Index extends Component
     public function submitSearch()
     {
         $this->authorizeAdminAccess();
-        if ($this->search !== '') {
-            $this->foundUsers = User::where(function ($query) {
-                $query->where('name', 'like', "%{$this->search}%")
-                    ->orWhere('email', 'like', "%{$this->search}%");
-            })->get();
-        }
+        $this->loadUsers();
     }
 
     public function getSubscribers()
     {
-        if (Auth::id() !== 0 && ! session('impersonating')) {
-            return redirect()->route('dashboard');
+        if (Auth::id() !== 0 && ! isInstanceAdmin() && ! session('impersonating')) {
+            abort(403);
         }
         $this->inactiveSubscribers = Team::whereRelation('subscription', 'stripe_invoice_paid', false)->count();
         $this->activeSubscribers = Team::whereRelation('subscription', 'stripe_invoice_paid', true)->count();
@@ -78,15 +113,15 @@ class Index extends Component
 
     private function authorizeAdminAccess(): void
     {
-        if (! Auth::check() || (Auth::id() !== 0 && ! session('impersonating'))) {
-            abort(403);
+        if (! Auth::check() || (! isInstanceAdmin() && Auth::id() !== 0 && ! session('impersonating'))) {
+            abort(403, 'Unauthorized access to admin panel');
         }
     }
 
     private function authorizeRootOnly(): void
     {
-        if (! Auth::check() || Auth::id() !== 0) {
-            abort(403);
+        if (! Auth::check() || (! isInstanceAdmin() && Auth::id() !== 0)) {
+            abort(403, 'Unauthorized access to admin panel');
         }
     }
 

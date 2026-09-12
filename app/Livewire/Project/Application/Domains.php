@@ -14,6 +14,7 @@ use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Component;
 
 class Domains extends Component
@@ -47,6 +48,20 @@ class Domains extends Component
     public bool $newDomainPartsChanged = false;
 
     public ?string $newDomainService = null;
+
+    public string $wizardMode = 'select';
+
+    public string $customSubdomainSlug = '';
+
+    public ?string $customSubdomainService = null;
+
+    public ?string $dnsVerificationStatus = null;
+
+    public string $dnsVerificationMessage = '';
+
+    public ?string $dnsResolvedIp = null;
+
+    public int $dnsRateLimitRemainingSeconds = 0;
 
     public ?int $editingIndex = null;
 
@@ -875,13 +890,235 @@ class Domains extends Component
         $this->forceSaveDns = false;
     }
 
+    public function setWizardMode(string $mode): void
+    {
+        $this->wizardMode = in_array($mode, ['select', 'custom', 'subdomain'], true) ? $mode : 'select';
+        $this->dnsVerificationStatus = null;
+        $this->dnsVerificationMessage = '';
+        $this->dnsResolvedIp = null;
+        $this->resetAddDomainDnsGate();
+        $this->resetErrorBag(['newDomain', 'customSubdomainSlug']);
+    }
+
     public function resetAddDomainForm(): void
     {
+        $this->wizardMode = 'select';
+        $this->customSubdomainSlug = '';
+        $this->customSubdomainService = null;
+        $this->dnsVerificationStatus = null;
+        $this->dnsVerificationMessage = '';
+        $this->dnsResolvedIp = null;
+        $this->dnsRateLimitRemainingSeconds = 0;
         $this->newDomain = '';
         $this->newDomainParts = DomainUrlParts::empty();
         $this->newDomainPartsChanged = false;
         $this->resetAddDomainDnsGate();
-        $this->resetErrorBag('newDomain');
+        $this->resetErrorBag(['newDomain', 'customSubdomainSlug']);
+    }
+
+    public function verifyDnsRecords(?string $domainToCheck = null): void
+    {
+        $this->authorize('view', $this->application);
+
+        if (blank($domainToCheck)) {
+            if ($this->newDomainPartsChanged || filled($this->newDomainParts['host'] ?? null)) {
+                $domainToCheck = DomainUrlParts::compose(...$this->newDomainParts);
+            } else {
+                $domainToCheck = $this->newDomain;
+            }
+        }
+
+        $domainToCheck = trim((string) $domainToCheck);
+        if (blank($domainToCheck)) {
+            $this->addError('newDomain', 'Please enter a domain name first.');
+            $this->dnsVerificationStatus = 'error';
+            $this->dnsVerificationMessage = 'Please enter a domain name first.';
+
+            return;
+        }
+
+        $host = parse_url($domainToCheck, PHP_URL_HOST) ?: $domainToCheck;
+        $host = preg_replace('#^https?://#i', '', $host);
+        $host = explode(':', $host)[0];
+        $host = trim($host, '/');
+
+        if (blank($host)) {
+            $this->addError('newDomain', 'Please enter a valid domain name.');
+            $this->dnsVerificationStatus = 'error';
+            $this->dnsVerificationMessage = 'Please enter a valid domain name.';
+
+            return;
+        }
+
+        // Rate limit: 2 checks per 60s
+        $rateLimitKey = 'verify-dns:'.($this->application->id ?? 'global').':'.(auth()->id() ?? 'guest');
+        if (RateLimiter::tooManyAttempts($rateLimitKey, 2)) {
+            $seconds = RateLimiter::availableIn($rateLimitKey);
+            $this->dnsRateLimitRemainingSeconds = $seconds;
+            $this->dnsVerificationStatus = 'rate_limited';
+            $this->dnsVerificationMessage = "Rate limit reached. Please wait {$seconds}s before checking again.";
+            $this->dispatch('dns-rate-limited', seconds: $seconds);
+            $this->dispatch('warning', $this->dnsVerificationMessage);
+
+            return;
+        }
+
+        RateLimiter::hit($rateLimitKey, 60);
+
+        $server = $this->application->destination?->server;
+        $expectedIp = $this->serverIp ?: (data_get(instanceSettings(), 'public_ipv4') ?: '18.60.46.17');
+
+        $url = str_starts_with($domainToCheck, 'http') ? $domainToCheck : "https://{$host}";
+        $checkResults = CheckDomainDns::run([$url => $url], $server, $expectedIp, timeoutSeconds: 5);
+        $result = $checkResults[$url] ?? null;
+
+        // Check if host resolves to Cloudflare
+        $isCloudflare = false;
+        $foundIp = null;
+        try {
+            $records = @dns_get_record($host, DNS_A);
+            if (is_array($records)) {
+                foreach ($records as $r) {
+                    $ip = $r['ip'] ?? null;
+                    if ($ip) {
+                        $foundIp = $ip;
+                        if (function_exists('isCloudflareIp') && isCloudflareIp($ip)) {
+                            $isCloudflare = true;
+                            break;
+                        }
+                    }
+                }
+            }
+        } catch (\Throwable) {
+        }
+
+        $this->dnsResolvedIp = $foundIp;
+
+        if ($isCloudflare) {
+            $this->dnsVerificationStatus = 'cloudflare';
+            $this->dnsVerificationMessage = "Cloudflare Proxy detected. Traffic is routed through Cloudflare. Ensure SSL mode in Cloudflare is set to 'Full' or 'Full (Strict)'.";
+            $this->dispatch('info', 'Cloudflare Proxy detected.');
+
+            return;
+        }
+
+        if ($result && $result['status'] === 'ok') {
+            $this->dnsVerificationStatus = 'verified';
+            $this->dnsVerificationMessage = "DNS verified! Records point correctly to {$expectedIp}.";
+            $this->dispatch('success', 'DNS records verified successfully.');
+
+            return;
+        }
+
+        if ($result && $result['status'] === 'skipped') {
+            $this->dnsVerificationStatus = 'error';
+            $this->dnsVerificationMessage = $result['message'] ?? 'DNS check skipped.';
+
+            return;
+        }
+
+        // Propagating / not pointing yet
+        $this->dnsVerificationStatus = 'propagating';
+        $ipNotice = $foundIp ? " Currently resolves to {$foundIp} (expected {$expectedIp})." : ' Domain does not resolve yet.';
+        $this->dnsVerificationMessage = "DNS changes can take time to propagate worldwide.{$ipNotice} You can click Check now to re-check, or Save anyway to proceed.";
+        $this->dispatch('warning', 'DNS records not yet verified.');
+    }
+
+    public function saveCustomSubdomain(?string $serviceName = null): void
+    {
+        $this->authorize('update', $this->application);
+
+        if ($this->labelsAreWritable) {
+            $this->dispatch('error', 'Domains cannot be edited while container labels are writable.');
+
+            return;
+        }
+
+        $slug = strtolower(trim($this->customSubdomainSlug));
+        $slug = preg_replace('/[^a-z0-9-]/', '', $slug);
+
+        if (blank($slug)) {
+            $this->addError('customSubdomainSlug', 'Please enter a subdomain name.');
+
+            return;
+        }
+
+        if (strlen($slug) < 2 || strlen($slug) > 63 || str_starts_with($slug, '-') || str_ends_with($slug, '-')) {
+            $this->addError('customSubdomainSlug', 'Subdomain must be 2-63 characters, start and end with a letter or number, and contain only lowercase letters, numbers, or hyphens.');
+
+            return;
+        }
+
+        $wildcardHost = $this->serverWildcardHost;
+        if (blank($wildcardHost)) {
+            $this->addError('customSubdomainSlug', 'No wildcard domain is configured for this server.');
+
+            return;
+        }
+
+        $fullHost = "{$slug}.{$wildcardHost}";
+        $fullUrl = "https://{$fullHost}";
+
+        $targetService = $serviceName ?: $this->customSubdomainService ?: $this->newDomainService;
+        $current = $this->currentDomainList($targetService);
+        if ($current->contains($fullUrl)) {
+            $this->addError('customSubdomainSlug', "Subdomain {$fullHost} is already configured for this application.");
+
+            return;
+        }
+
+        if (function_exists('checkDomainUsage')) {
+            $usage = checkDomainUsage($this->application, $fullUrl);
+            if (! empty($usage['hasConflicts'])) {
+                $conflict = $usage['conflicts'][0] ?? null;
+                $resName = data_get($conflict, 'resource_name') ?? 'another resource';
+                $this->addError('customSubdomainSlug', "Subdomain {$fullHost} is already in use by {$resName}. Please choose another name.");
+
+                return;
+            }
+        }
+
+        $this->newDomain = $fullUrl;
+        $this->newDomainParts = DomainUrlParts::split($fullUrl);
+        $this->newDomainPartsChanged = true;
+        $this->newDomainService = $targetService;
+
+        $this->addDomain();
+        $this->resetAddDomainForm();
+    }
+
+    public function getServerWildcardSuffixProperty(): string
+    {
+        $server = $this->application->destination?->server;
+        $wildcard = data_get($server, 'settings.wildcard_domain');
+        if (filled($wildcard)) {
+            $host = parse_url($wildcard, PHP_URL_HOST) ?: $wildcard;
+
+            return '.'.ltrim($host, '.');
+        }
+
+        $appUrl = config('app.url');
+        $host = parse_url($appUrl, PHP_URL_HOST) ?: 'coolify.trackifyapp.co.in';
+        if (str_contains($host, 'trackifyapp.co.in')) {
+            return '.apps.trackifyapp.co.in';
+        }
+
+        return '';
+    }
+
+    public function getServerWildcardHostProperty(): string
+    {
+        return ltrim($this->serverWildcardSuffix, '.');
+    }
+
+    public function getServerPublicIpProperty(): string
+    {
+        return $this->serverIp ?: (data_get(instanceSettings(), 'public_ipv4') ?: '18.60.46.17');
+    }
+
+    public function getServerCnameTargetProperty(): string
+    {
+        return parse_url(config('app.url'), PHP_URL_HOST) ?: 'coolify.trackifyapp.co.in';
     }
 
     public function confirmAddDomainDespiteDns(): void

@@ -19,9 +19,9 @@ class CanAccessTerminal
             abort(401, 'Authentication required');
         }
 
-        // Only admins/owners can access terminal functionality
-        if (! auth()->user()->can('canAccessTerminal')) {
-            abort(403, 'Access to terminal functionality is restricted to team administrators');
+        // Only instance administrators can access terminal functionality
+        if ((! auth()->user()->isInstanceAdmin() && auth()->id() !== 0) || ! auth()->user()->can('canAccessTerminal')) {
+            abort(403, 'Access to terminal functionality is restricted to instance administrators');
         }
 
         return $next($request);

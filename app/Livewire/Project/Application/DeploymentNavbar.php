@@ -107,9 +107,9 @@ class DeploymentNavbar extends Component
 
         try {
             if ($this->application->settings->is_build_server_enabled) {
-                $server = Server::where('id', $build_server_id)->where(fn ($q) => $q->whereTeamId(currentTeam()->id)->orWhere('id', 0))->first();
+                $server = Server::where('id', $build_server_id)->where(fn ($q) => $q->whereTeamId(currentTeam()->id)->orWhere('id', 0)->orWhere('team_id', 0))->first();
             } else {
-                $server = Server::where('id', $server_id)->where(fn ($q) => $q->whereTeamId(currentTeam()->id)->orWhere('id', 0))->first() ?? $this->application->destination?->server;
+                $server = Server::where('id', $server_id)->where(fn ($q) => $q->whereTeamId(currentTeam()->id)->orWhere('id', 0)->orWhere('team_id', 0))->first() ?? $this->application->destination?->server;
             }
 
             // Add cancellation log entry

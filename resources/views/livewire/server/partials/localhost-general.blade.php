@@ -42,6 +42,10 @@
                         @endif
                     </x-application.settings-section>
 
+                    @if ($server->isFunctional())
+                        @include('livewire.server.partials.server-live-monitor', ['server' => $server])
+                    @endif
+
                     @if ($server->validation_logs)
                         <x-application.settings-section title="Previous validation output"
                             helper="The latest output produced while checking this server.">

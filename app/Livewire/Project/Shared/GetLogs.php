@@ -133,7 +133,7 @@ class GetLogs extends Component
 
     public function getLogs($refresh = false)
     {
-        if (! Server::ownedByCurrentTeam()->where('id', $this->server->id)->exists() && $this->server->id !== 0) {
+        if (! Server::ownedByCurrentTeam()->where('id', $this->server->id)->exists() && (int) $this->server->id !== 0 && (int) $this->server->team_id !== 0) {
             $this->outputs = 'Unauthorized.';
 
             return;
@@ -238,7 +238,7 @@ class GetLogs extends Component
 
     public function downloadAllLogs(): string
     {
-        if (! Server::ownedByCurrentTeam()->where('id', $this->server->id)->exists() && $this->server->id !== 0) {
+        if (! Server::ownedByCurrentTeam()->where('id', $this->server->id)->exists() && (int) $this->server->id !== 0 && (int) $this->server->team_id !== 0) {
             return '';
         }
         if (! $this->server->isFunctional() || ! $this->container) {
