@@ -17,6 +17,10 @@ class Index extends Component
 
     public function mount(): void
     {
+        if (currentTeam()?->id !== 0) {
+            abort(403);
+        }
+
         $this->servers = Server::isUsable()->get();
         $this->destinations = $this->servers
             ->flatMap(fn (Server $server) => $server->standaloneDockers->concat($server->swarmDockers))

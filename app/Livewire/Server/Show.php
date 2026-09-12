@@ -195,6 +195,10 @@ class Show extends Component
 
     public function mount(string $server_uuid)
     {
+        if (currentTeam()?->id !== 0) {
+            return abort(403, 'Server management is restricted to instance administrators.');
+        }
+
         try {
             $this->server = Server::ownedByCurrentTeam()->whereUuid($server_uuid)->firstOrFail();
             $this->syncData();

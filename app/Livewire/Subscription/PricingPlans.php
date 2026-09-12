@@ -26,13 +26,22 @@ class PricingPlans extends Component
         }
 
         $priceId = match ($type) {
+            'starter' => config('subscription.stripe_price_id_starter') ?? config('subscription.stripe_price_id_dynamic_monthly'),
+            'pro' => config('subscription.stripe_price_id_pro') ?? config('subscription.stripe_price_id_dynamic_monthly'),
+            'business' => config('subscription.stripe_price_id_business') ?? config('subscription.stripe_price_id_dynamic_monthly'),
             'dynamic-monthly' => config('subscription.stripe_price_id_dynamic_monthly'),
             'dynamic-yearly' => config('subscription.stripe_price_id_dynamic_yearly'),
             default => config('subscription.stripe_price_id_dynamic_monthly'),
         };
 
+        if (! config('subscription.stripe_api_key')) {
+            $this->dispatch('info', 'Payment Gateway Integration', 'Payment processing for the ' . ucfirst($type) . ' plan is being activated. Please contact support to upgrade your team limits immediately.');
+
+            return null;
+        }
+
         if (! $priceId) {
-            $this->dispatch('error', 'Price ID not found! Please contact the administrator.');
+            $this->dispatch('error', 'Price ID not configured for this plan. Please contact support.');
 
             return null;
         }

@@ -42,6 +42,10 @@ class Configuration extends Component
             $this->database = $database;
             $this->project = $project;
             $this->environment = $environment;
+            if (currentTeam()?->id !== 0 && $this->currentRoute === 'project.database.servers') {
+                return redirect()->route('project.database.configuration', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'database_uuid' => $database->uuid]);
+            }
+
             if (str($this->database->status)->startsWith('running') && is_null($this->database->config_hash)) {
                 $this->database->isConfigurationChanged(true);
                 $this->dispatch('configurationChanged');

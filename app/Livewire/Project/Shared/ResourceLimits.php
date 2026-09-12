@@ -123,6 +123,16 @@ class ResourceLimits extends Component
 
             $this->validate();
 
+            $team = currentTeam();
+            if ($team && $team->id !== 0) {
+                $limits = teamResourceLimits($team);
+                if (! empty($this->limitsCpus) && ((float) $this->limitsCpus == 0 || (float) $this->limitsCpus > (float) $limits['cpus'])) {
+                    $this->dispatch('error', 'CPU limit exceeded', "Your {$limits['name']} plan allows a maximum of {$limits['cpus']} vCPUs. Please upgrade your plan to increase CPU limits.");
+
+                    return;
+                }
+            }
+
             $this->syncData(true);
             $this->resource->save();
             $this->dispatch('success', 'Resource limits updated.');

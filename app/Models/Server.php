@@ -521,7 +521,14 @@ class Server extends BaseModel
 
     private static function usableByBuildServerStatus(bool $isBuildServer): Builder
     {
-        return Server::ownedByCurrentTeam()
+        $team = currentTeam();
+        $teamId = $team?->id ?? 0;
+
+        $query = Server::where(function ($q) use ($teamId) {
+            $q->whereTeamId($teamId)->orWhere('id', 0);
+        })->with('settings', 'swarmDockers', 'standaloneDockers')->orderBy('name');
+
+        return $query
             ->whereRelation('settings', 'is_reachable', true)
             ->whereRelation('settings', 'is_usable', true)
             ->whereRelation('settings', 'is_swarm_worker', false)

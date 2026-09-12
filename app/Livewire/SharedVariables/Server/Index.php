@@ -12,6 +12,10 @@ class Index extends Component
 
     public function mount()
     {
+        if (currentTeam()?->id !== 0) {
+            abort(403);
+        }
+
         $this->servers = Server::ownedByCurrentTeamCached();
     }
 

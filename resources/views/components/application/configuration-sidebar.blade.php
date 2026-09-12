@@ -72,6 +72,7 @@
                 'route' => 'project.application.servers',
                 'active' => $currentRoute === 'project.application.servers',
                 'badge' => true,
+                'visible' => currentTeam()?->id === 0,
             ],
             [
                 'label' => 'Scheduled Tasks',

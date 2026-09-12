@@ -151,6 +151,7 @@
     $watch('selectedMoveProject', () => selectedMoveEnvironment = null);
 " class="flex flex-col gap-6">
     @can('update', $resource)
+        @if (currentTeam()?->id === 0)
         <x-application.settings-section id="clone-destination-section" title="Clone to another destination"
             helper="Create the clone in the current environment on another server or network.">
             <x-callout type="info" title="Configuration only">
@@ -180,8 +181,9 @@
                 </x-forms.button>
             </div>
         </x-application.settings-section>
+        @endif
 
-        @if (isDev())
+        @if (isDev() && currentTeam()?->id === 0)
             <x-application.settings-section id="migrate-destination-section" title="Migrate to another server"
                 helper="Move this resource to a different validated and reachable server. The resource is stopped and persistent volumes can be transferred.">
                 <x-slot:actions>
@@ -242,8 +244,11 @@
             <div x-show="selectedCloneEnvironment" x-cloak
                 class="mt-4 flex flex-col gap-3 border-t border-neutral-200 pt-4 sm:flex-row sm:items-center sm:justify-between dark:border-white/[0.07]">
                 <p class="text-[13px] text-neutral-500 dark:text-fg-dim">
-                    Uses {{ data_get($resource, 'destination.server.name') }} ·
-                    {{ data_get($resource, 'destination.network') }}.
+                    @if(currentTeam()?->id === 0)
+                        Uses {{ data_get($resource, 'destination.server.name') }} · {{ data_get($resource, 'destination.network') }}.
+                    @else
+                        Deploys automatically on Managed Cloud.
+                    @endif
                 </p>
                 <x-forms.button
                     @click="$wire.cloneTo(currentDestinationUuid, selectedCloneEnvironment)">

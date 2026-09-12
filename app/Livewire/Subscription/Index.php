@@ -118,6 +118,11 @@ class Index extends Component
 
     public function render()
     {
-        return view('livewire.subscription.index');
+        return view('livewire.subscription.index', [
+            'loading' => $this->loading,
+            'isUnpaid' => $this->isUnpaid,
+            'isCancelled' => $this->isCancelled,
+            'isMember' => $this->isMember,
+        ]);
     }
 }

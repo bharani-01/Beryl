@@ -12,6 +12,10 @@ class Index extends Component
 
     public function mount()
     {
+        if (currentTeam()?->id !== 0) {
+            return abort(403, 'Server management is restricted to instance administrators.');
+        }
+
         $this->servers = Server::ownedByCurrentTeamCached();
     }
 

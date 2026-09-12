@@ -111,6 +111,7 @@
             @endif
         </section>
 
+        @if (currentTeam()?->id === 0)
         <section class="mb-0! min-w-0">
             <x-section-heading title="Servers" subtitle="Infrastructure available for deployments"
                 :href="route('server.index')" />
@@ -201,5 +202,6 @@
                 </div>
             @endif
         </section>
+        @endif
     </div>
 </div>

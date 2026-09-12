@@ -616,7 +616,7 @@
             </script>
         @endif
     </div>
-    @if ($current_step === 'servers')
+    @if ($current_step === 'servers' && currentTeam()?->id === 0)
         <x-application.settings-section title="Select a server"
             description="Choose the machine that will host this resource." flush>
             @if ($onlyBuildServerAvailable)
@@ -658,26 +658,27 @@
                 @endforelse
 
                 @foreach($buildServers ?? [] as $buildServer)
-                    <div class="flex min-h-14 items-center gap-3 px-4 py-3 opacity-55">
+                    <div
+                        class="flex min-h-14 w-full items-center gap-3 px-4 py-3 opacity-60">
                         <span
                             class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-dim">
                             <x-reicon name="servers" class="size-4" />
                         </span>
                         <span class="min-w-0 flex-1">
-                            <span
-                                class="block truncate text-[13px] font-semibold text-black dark:text-fg">{{ $buildServer->name }}</span>
-                            <span class="block text-[11px] text-neutral-500 dark:text-fg-faint">Build-only servers
-                                cannot host resources.</span>
+                            <span class="block truncate text-[13px] font-semibold text-black dark:text-fg">
+                                {{ $buildServer->name }}
+                            </span>
+                            <span class="block truncate text-[11px] text-neutral-500 dark:text-fg-faint">
+                                Build server &middot; Cannot host resources
+                            </span>
                         </span>
-                        <x-status-badge status="exited" text="Build only" />
-                        <a href="{{ route('server.show', ['server_uuid' => $buildServer->uuid]) }}"
-                            {{ wireNavigate() }} class="button">Settings</a>
+                        <x-status-badge status="stopped" text="Build server" />
                     </div>
                 @endforeach
             </div>
         </x-application.settings-section>
     @endif
-    @if ($current_step === 'destinations')
+    @if ($current_step === 'destinations' && currentTeam()?->id === 0)
         <x-application.settings-section title="Select a destination"
             description="Destinations separate resources by Docker network. Use the default destination when unsure."
             flush>

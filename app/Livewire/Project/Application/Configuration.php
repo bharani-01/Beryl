@@ -48,6 +48,10 @@ class Configuration extends Component
         $this->environment = $environment;
         $this->application = $application;
 
+        if (currentTeam()?->id !== 0 && $this->currentRoute === 'project.application.servers') {
+            return redirect()->route('project.application.configuration', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]);
+        }
+
         if ($this->application->build_pack === 'dockercompose' && $this->currentRoute === 'project.application.healthcheck') {
             return redirect()->route('project.application.configuration', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]);
         }

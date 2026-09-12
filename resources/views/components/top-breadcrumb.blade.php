@@ -111,9 +111,13 @@
             auth()->user()?->can('canAccessTerminal')
                 ? ['label' => 'Terminal', 'href' => route('terminal')]
                 : null,
-            ['label' => 'Servers', 'href' => url('/servers')],
+            currentTeam()?->id === 0
+                ? ['label' => 'Servers', 'href' => url('/servers')]
+                : null,
             ['label' => 'Sources', 'href' => route('source.all')],
-            ['label' => 'Destinations', 'href' => route('destination.index')],
+            currentTeam()?->id === 0
+                ? ['label' => 'Destinations', 'href' => route('destination.index')]
+                : null,
             ['label' => 'S3 Storage', 'href' => route('storage.index')],
             ['label' => 'Shared Variables', 'href' => route('shared-variables.index')],
             ['label' => 'Team', 'href' => route('team.index')],

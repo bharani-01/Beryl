@@ -12,7 +12,7 @@ class ServerPolicy
      */
     public function viewAny(User $user): bool
     {
-        return true;
+        return currentTeam()?->id === 0;
     }
 
     /**
@@ -20,7 +20,7 @@ class ServerPolicy
      */
     public function view(User $user, Server $server): bool
     {
-        return $user->teams->contains('id', $server->team_id);
+        return currentTeam()?->id === 0 && $user->teams->contains('id', $server->team_id);
     }
 
     /**
@@ -28,7 +28,7 @@ class ServerPolicy
      */
     public function create(User $user): bool
     {
-        return $user->isAdmin();
+        return currentTeam()?->id === 0 && $user->isAdmin();
     }
 
     /**
@@ -36,7 +36,7 @@ class ServerPolicy
      */
     public function update(User $user, Server $server): bool
     {
-        return $user->isAdminOfTeam($server->team_id);
+        return currentTeam()?->id === 0 && $user->isAdminOfTeam($server->team_id);
     }
 
     /**
@@ -44,7 +44,7 @@ class ServerPolicy
      */
     public function delete(User $user, Server $server): bool
     {
-        return $user->isAdminOfTeam($server->team_id);
+        return currentTeam()?->id === 0 && $user->isAdminOfTeam($server->team_id);
     }
 
     /**
@@ -68,7 +68,7 @@ class ServerPolicy
      */
     public function manageProxy(User $user, Server $server): bool
     {
-        return $user->isAdminOfTeam($server->team_id);
+        return currentTeam()?->id === 0 && $user->isAdminOfTeam($server->team_id);
     }
 
     /**
@@ -76,7 +76,7 @@ class ServerPolicy
      */
     public function manageSentinel(User $user, Server $server): bool
     {
-        return $user->isAdminOfTeam($server->team_id);
+        return currentTeam()?->id === 0 && $user->isAdminOfTeam($server->team_id);
     }
 
     /**
@@ -84,7 +84,7 @@ class ServerPolicy
      */
     public function viewSentinel(User $user, Server $server): bool
     {
-        return $user->isAdminOfTeam($server->team_id);
+        return currentTeam()?->id === 0 && $user->isAdminOfTeam($server->team_id);
     }
 
     /**
@@ -92,7 +92,7 @@ class ServerPolicy
      */
     public function manageCaCertificate(User $user, Server $server): bool
     {
-        return $user->isAdminOfTeam($server->team_id);
+        return currentTeam()?->id === 0 && $user->isAdminOfTeam($server->team_id);
     }
 
     /**
@@ -100,6 +100,6 @@ class ServerPolicy
      */
     public function viewSecurity(User $user, Server $server): bool
     {
-        return $user->isAdminOfTeam($server->team_id);
+        return currentTeam()?->id === 0 && $user->isAdminOfTeam($server->team_id);
     }
 }

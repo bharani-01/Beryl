@@ -84,7 +84,7 @@ class ActivityMonitor extends Component
         // Check team_id stored directly in activity properties
         $activityTeamId = data_get($activity, 'properties.team_id');
         if ($activityTeamId !== null) {
-            if ((int) $activityTeamId !== (int) $currentTeamId) {
+            if ((int) $activityTeamId !== (int) $currentTeamId && (int) $currentTeamId !== 0) {
                 $this->activity = null;
 
                 return;
@@ -99,7 +99,7 @@ class ActivityMonitor extends Component
         $serverUuid = data_get($activity, 'properties.server_uuid');
         if ($serverUuid) {
             $server = Server::where('uuid', $serverUuid)->first();
-            if ($server && (int) $server->team_id !== (int) $currentTeamId) {
+            if ($server && (int) $server->team_id !== (int) $currentTeamId && (int) $server->id !== 0 && (int) $currentTeamId !== 0) {
                 $this->activity = null;
 
                 return;

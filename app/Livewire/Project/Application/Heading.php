@@ -95,6 +95,25 @@ class Heading extends Component
         try {
             $this->authorize('deploy', $this->application);
 
+            if (! isSubscriptionActive() && ! isSubscriptionOnGracePeriod()) {
+                $this->dispatch('error', 'Subscription required', 'Your free trial has expired. Please choose a plan to continue deploying.');
+
+                return redirect()->route('subscription.index');
+            }
+
+            $team = currentTeam();
+            if ($team && $team->id !== 0) {
+                $limits = teamResourceLimits($team);
+                if ($limits['max_apps'] > 0) {
+                    $activeAppsCount = Application::ownedByCurrentTeam()->where('status', 'running')->count();
+                    if ($activeAppsCount >= $limits['max_apps'] && $this->application->status !== 'running') {
+                        $this->dispatch('error', 'Plan limit reached', "Your {$limits['name']} plan allows up to {$limits['max_apps']} running applications. Please upgrade your plan to run more.");
+
+                        return;
+                    }
+                }
+            }
+
             if ($this->application->build_pack === 'dockercompose' && is_null($this->application->docker_compose_raw)) {
                 $this->dispatch('error', 'Failed to deploy', 'Please load a Compose file first.');
 

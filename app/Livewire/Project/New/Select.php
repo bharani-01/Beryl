@@ -82,8 +82,18 @@ class Select extends Component
                 $this->type = $queryType;
                 $this->server_id = $queryServerId;
                 $this->destination_uuid = $queryDestination;
-                $this->server = Server::ownedByCurrentTeam()->find($queryServerId);
+                $this->server = Server::where('id', $queryServerId)->where(fn ($q) => $q->whereTeamId(currentTeam()->id)->orWhere('id', 0))->first();
                 $this->current_step = 'select-postgresql-type';
+            } elseif (currentTeam()?->id !== 0) {
+                $server0 = Server::find(0);
+                if ($server0) {
+                    $this->server = $server0;
+                    $this->server_id = (string) $server0->id;
+                    $docker = $server0->standaloneDockers->first() ?? $server0->destinations()->first();
+                    if ($docker) {
+                        $this->destination_uuid = $docker->uuid;
+                    }
+                }
             }
         } catch (\Exception $e) {
             return handleError($e, $this);
@@ -360,6 +370,22 @@ class Select extends Component
         }
         $this->loading = true;
         $this->type = $type;
+
+        // For managed users (non-root), automatically bind to managed Server 0 and Destination 0
+        if (currentTeam()?->id !== 0) {
+            $server = Server::find(0);
+            if ($server) {
+                $this->server_id = (string) $server->id;
+                $this->server = $server;
+                $docker = $server->standaloneDockers->first() ?? $server->destinations()->first();
+                if ($docker) {
+                    $this->destination_uuid = $docker->uuid;
+
+                    return $this->whatToDoNext();
+                }
+            }
+        }
+
         switch ($type) {
             case 'postgresql':
             case 'mysql':

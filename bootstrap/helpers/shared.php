@@ -524,7 +524,15 @@ function isInstanceAdmin()
 
 function currentTeam()
 {
-    return Auth::user()?->currentTeam() ?? null;
+    $team = Auth::user()?->currentTeam() ?? null;
+    if (! $team && Auth::user()) {
+        $team = Auth::user()->resolveStoredTeam() ?? Auth::user()->teams()->first();
+        if ($team && function_exists('session') && session()) {
+            refreshSession($team);
+        }
+    }
+
+    return $team;
 }
 
 function find_destination_for_current_team(?string $uuid): StandaloneDocker|SwarmDocker|null
@@ -533,8 +541,14 @@ function find_destination_for_current_team(?string $uuid): StandaloneDocker|Swar
         return null;
     }
 
-    return StandaloneDocker::ownedByCurrentTeam()->where('uuid', $uuid)->first()
-        ?? SwarmDocker::ownedByCurrentTeam()->where('uuid', $uuid)->first();
+    $teamId = currentTeam()->id;
+
+    return StandaloneDocker::where('uuid', $uuid)
+        ->whereHas('server', fn ($q) => $q->whereTeamId($teamId)->orWhere('id', 0))
+        ->first()
+        ?? SwarmDocker::where('uuid', $uuid)
+        ->whereHas('server', fn ($q) => $q->whereTeamId($teamId)->orWhere('id', 0))
+        ->first();
 }
 
 function find_resource_destination_for_current_team(?string $uuid): StandaloneDocker|SwarmDocker|null
@@ -1329,14 +1343,14 @@ function data_get_str($data, $key, $default = null): Stringable
 function generateUrl(Server $server, string $random, bool $forceHttps = false): string
 {
     $wildcard = data_get($server, 'settings.wildcard_domain');
-    if (is_null($wildcard) || $wildcard === '') {
-        $wildcard = sslip($server);
+    if (is_null($wildcard) || $wildcard === '' || ($server->id === 0 && str_contains($wildcard, 'sslip.io'))) {
+        $wildcard = ($server->id === 0) ? 'https://apps.trackifyapp.co.in' : sslip($server);
     }
     $url = Url::fromString($wildcard);
     $host = $url->getHost();
     $path = $url->getPath() === '/' ? '' : $url->getPath();
     $scheme = $url->getScheme();
-    if ($forceHttps) {
+    if ($forceHttps || $server->id === 0) {
         $scheme = 'https';
     }
 
@@ -1346,14 +1360,14 @@ function generateFqdn(Server $server, string $random, bool $forceHttps = false, 
 {
 
     $wildcard = data_get($server, 'settings.wildcard_domain');
-    if (is_null($wildcard) || $wildcard === '') {
-        $wildcard = sslip($server);
+    if (is_null($wildcard) || $wildcard === '' || ($server->id === 0 && str_contains($wildcard, 'sslip.io'))) {
+        $wildcard = ($server->id === 0) ? 'https://apps.trackifyapp.co.in' : sslip($server);
     }
     $url = Url::fromString($wildcard);
     $host = $url->getHost();
     $path = $url->getPath() === '/' ? '' : $url->getPath();
     $scheme = $url->getScheme();
-    if ($forceHttps) {
+    if ($forceHttps || $server->id === 0) {
         $scheme = 'https';
     }
 

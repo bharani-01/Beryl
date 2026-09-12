@@ -74,9 +74,6 @@ class DecideWhatToDoWithUser
         if (auth()->user()->hasVerifiedEmail() && $request->path() === 'verify') {
             return redirect(RouteServiceProvider::HOME);
         }
-        if (isSubscriptionActive() && $request->routeIs('subscription.index')) {
-            return redirect(RouteServiceProvider::HOME);
-        }
 
         return $next($request);
     }

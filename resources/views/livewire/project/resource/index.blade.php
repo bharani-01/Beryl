@@ -173,7 +173,7 @@
                     <div class="resource-type">Type</div>
                     <div>Status</div>
                     <div class="resource-domain">Domain</div>
-                    <div class="resource-server">Server</div>
+                    <div class="resource-server">{{ currentTeam()?->id === 0 ? 'Server' : 'Hosting' }}</div>
                     <div class="resource-tags">Tags</div>
                 </div>
 
@@ -236,8 +236,13 @@
                             <span x-show="!item.fqdn" class="text-[12px] text-neutral-400 dark:text-fg-faint">-</span>
                         </div>
 
-                        <div class="resource-server truncate text-[12px] text-neutral-600 dark:text-fg-dim"
-                            x-text="item.destination?.server?.name || 'Unknown'"></div>
+                        <div class="resource-server truncate text-[12px] text-neutral-600 dark:text-fg-dim">
+                            @if(currentTeam()?->id === 0)
+                                <span x-text="item.destination?.server?.name || 'Unknown'"></span>
+                            @else
+                                <span>Managed Cloud</span>
+                            @endif
+                        </div>
 
                         <div class="resource-tags flex min-w-0 items-center gap-1 overflow-hidden">
                             <template x-for="tag in item.tags.slice(0, 2)" :key="tag.id">
@@ -378,6 +383,7 @@
                             (item.tags || []).map((tag) => ({ value: tag.name, label: tag.name }))
                         )),
                     },
+                    @if (currentTeam()?->id === 0)
                     {
                         key: 'serverFilters',
                         label: 'Servers',
@@ -386,6 +392,7 @@
                             label: item.destination?.server?.name || 'Unknown',
                         }))),
                     },
+                    @endif
                     {
                         key: 'statusFilters',
                         label: 'Statuses',

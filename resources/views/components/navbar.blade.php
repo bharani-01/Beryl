@@ -98,29 +98,31 @@
                 </li>
             @endcan
             {{-- Infrastructure --}}
-            <li class="nav-section mt-3" :class="collapsed && 'lg:hidden'">Infrastructure</li>
-            <li>
-                <a title="Servers" {{ wireNavigate() }}
-                    class="{{ request()->is('server/*') || request()->is('servers') ? 'menu-item menu-item-active' : 'menu-item' }}"
-                    :class="collapsed && 'lg:justify-center lg:px-0'" href="/servers">
-                    <x-reicon name="servers" class="menu-item-icon" />
-                    <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Servers</span>
-                </a>
-            </li>
+            @if (currentTeam()?->id === 0)
+                <li class="nav-section mt-3" :class="collapsed && 'lg:hidden'">Infrastructure</li>
+                <li>
+                    <a title="Servers" {{ wireNavigate() }}
+                        class="{{ request()->is('server/*') || request()->is('servers') ? 'menu-item menu-item-active' : 'menu-item' }}"
+                        :class="collapsed && 'lg:justify-center lg:px-0'" href="/servers">
+                        <x-reicon name="servers" class="menu-item-icon" />
+                        <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Servers</span>
+                    </a>
+                </li>
+                <li>
+                    <a title="Destinations" {{ wireNavigate() }}
+                        class="{{ request()->is('destination*') ? 'menu-item-active menu-item' : 'menu-item' }}"
+                        :class="collapsed && 'lg:justify-center lg:px-0'" href="{{ route('destination.index') }}">
+                        <x-reicon name="destinations" class="menu-item-icon" />
+                        <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Destinations</span>
+                    </a>
+                </li>
+            @endif
             <li>
                 <a title="Sources" {{ wireNavigate() }}
                     class="{{ request()->is('source*') ? 'menu-item-active menu-item' : 'menu-item' }}"
                     :class="collapsed && 'lg:justify-center lg:px-0'" href="{{ route('source.all') }}">
                     <x-reicon name="sources" class="menu-item-icon" />
                     <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Sources</span>
-                </a>
-            </li>
-            <li>
-                <a title="Destinations" {{ wireNavigate() }}
-                    class="{{ request()->is('destination*') ? 'menu-item-active menu-item' : 'menu-item' }}"
-                    :class="collapsed && 'lg:justify-center lg:px-0'" href="{{ route('destination.index') }}">
-                    <x-reicon name="destinations" class="menu-item-icon" />
-                    <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Destinations</span>
                 </a>
             </li>
             <li>

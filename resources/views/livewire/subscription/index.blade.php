@@ -24,9 +24,13 @@
                     </div>
                 </x-application.settings-section>
             @else
-                @if ($isCancelled || ! data_get(currentTeam(), 'subscription'))
-                    <x-callout type="warning" title="No active subscription" class="mb-6">
-                        Choose a plan to continue using Coolify Cloud.
+                @if (isTeamOnTrial())
+                    <x-callout type="success" title="14-day free trial active" class="mb-6">
+                        You have <strong class="font-medium dark:text-warning">{{ trialDaysRemaining() }} {{ Str::plural('day', trialDaysRemaining()) }} remaining</strong> on your free trial. You can deploy applications and databases to our managed cloud infrastructure without entering a credit card.
+                    </x-callout>
+                @elseif (! data_get(currentTeam(), 'subscription') || ! data_get(currentTeam(), 'subscription.stripe_invoice_paid'))
+                    <x-callout type="warning" title="Free trial expired" class="mb-6">
+                        Your 14-day free trial has ended. Choose a plan below to continue deploying.
                     </x-callout>
                 @endif
                 {{-- Stripe is the only cloud provider; always render pricing so the page is never blank. --}}

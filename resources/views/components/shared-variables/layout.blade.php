@@ -1,11 +1,11 @@
 @php
-    $sharedVariablesMenuItems = [
+    $sharedVariablesMenuItems = collect([
         ['label' => 'Overview', 'route' => 'shared-variables.index', 'icon' => 'dashboard', 'active' => request()->routeIs('shared-variables.index')],
         ['label' => 'Team', 'route' => 'shared-variables.team.index', 'icon' => 'teams', 'active' => request()->routeIs('shared-variables.team.*')],
         ['label' => 'Projects', 'route' => 'shared-variables.project.index', 'icon' => 'projects', 'active' => request()->routeIs('shared-variables.project.*')],
         ['label' => 'Environments', 'route' => 'shared-variables.environment.index', 'icon' => 'layers', 'active' => request()->routeIs('shared-variables.environment.*')],
-        ['label' => 'Servers', 'route' => 'shared-variables.server.index', 'icon' => 'servers', 'active' => request()->routeIs('shared-variables.server.*')],
-    ];
+        ['label' => 'Servers', 'route' => 'shared-variables.server.index', 'icon' => 'servers', 'active' => request()->routeIs('shared-variables.server.*'), 'visible' => currentTeam()?->id === 0],
+    ])->filter(fn ($item) => $item['visible'] ?? true);
 @endphp
 
 <section class="w-full max-w-none">
