@@ -370,7 +370,7 @@
                     key: data.key,
                     amount: data.amount,
                     currency: data.currency || 'INR',
-                    name: data.name || 'Coolify',
+                    name: data.name || '{{ config('app.name', 'Beryl') }}',
                     description: data.description || 'Plan Subscription',
                     order_id: data.order_id,
                     prefill: data.prefill || {},
