@@ -212,6 +212,53 @@ function teamResourceLimits(?Team $team = null): array
     ];
 }
 
+function parseMemoryStringToBytes(string|int|null $memory): ?int
+{
+    if ($memory === null) {
+        return null;
+    }
+
+    $memory = trim((string) $memory);
+    if ($memory === '' || $memory === '0' || strtolower($memory) === 'unlimited') {
+        return 0;
+    }
+
+    if (! preg_match('/^(\d+(?:\.\d+)?)\s*([bkmgtp]?)(?:b)?$/i', $memory, $matches)) {
+        return null;
+    }
+
+    $value = (float) $matches[1];
+    $unit = strtolower($matches[2] ?? '');
+
+    $multiplier = match ($unit) {
+        'k' => 1024,
+        'm' => 1024 ** 2,
+        'g' => 1024 ** 3,
+        't' => 1024 ** 4,
+        'p' => 1024 ** 5,
+        default => 1,
+    };
+
+    return (int) round($value * $multiplier);
+}
+
+function isMemoryLimitExceeded(string|int|null $requestedMemory, string|int|null $planMemory): bool
+{
+    $planBytes = parseMemoryStringToBytes($planMemory);
+    // If plan is unlimited or unconfigured, not exceeded
+    if ($planBytes === null || $planBytes === 0) {
+        return false;
+    }
+
+    $requestedBytes = parseMemoryStringToBytes($requestedMemory);
+    // Requesting 0/empty/unlimited on a metered plan is an exceed
+    if ($requestedBytes === null || $requestedBytes === 0) {
+        return true;
+    }
+
+    return $requestedBytes > $planBytes;
+}
+
 function teamStorageUsage(?Team $team = null): array
 {
     $team = $team ?? currentTeam();
@@ -227,10 +274,26 @@ function teamStorageUsage(?Team $team = null): array
         ];
     }
 
+    $dbClasses = [
+        \App\Models\StandalonePostgresql::class,
+        \App\Models\StandaloneMysql::class,
+        \App\Models\StandaloneMariadb::class,
+        \App\Models\StandaloneMongodb::class,
+        \App\Models\StandaloneRedis::class,
+        \App\Models\StandaloneKeydb::class,
+        \App\Models\StandaloneDragonfly::class,
+        \App\Models\StandaloneClickhouse::class,
+    ];
+
     if ($team->id === 0) {
+        $totalDbs = 0;
+        foreach ($dbClasses as $dbClass) {
+            $totalDbs += $dbClass::count();
+        }
+
         return [
             'apps_count' => \App\Models\Application::count(),
-            'databases_count' => \App\Models\StandalonePostgresql::count(),
+            'databases_count' => $totalDbs,
             'volumes_count' => \App\Models\LocalPersistentVolume::count(),
             'storage_limit_gb' => null,
             'storage_limit_formatted' => 'Unlimited',
@@ -240,8 +303,19 @@ function teamStorageUsage(?Team $team = null): array
     }
 
     $appsCount = \App\Models\Application::whereHas('environment.project', fn ($q) => $q->where('team_id', $team->id))->count();
-    $dbsCount = \App\Models\StandalonePostgresql::whereHas('environment.project', fn ($q) => $q->where('team_id', $team->id))->count();
-    $volumesCount = \App\Models\LocalPersistentVolume::whereHasMorph('resource', [\App\Models\Application::class], fn ($q) => $q->whereHas('environment.project', fn ($p) => $p->where('team_id', $team->id)))->count();
+    $dbsCount = 0;
+    foreach ($dbClasses as $dbClass) {
+        $dbsCount += $dbClass::whereHas('environment.project', fn ($q) => $q->where('team_id', $team->id))->count();
+    }
+
+    $appVolumes = \App\Models\LocalPersistentVolume::whereHasMorph('resource', [\App\Models\Application::class], fn ($q) => $q->whereHas('environment.project', fn ($p) => $p->where('team_id', $team->id)))->count();
+    $dbVolumes = \App\Models\LocalPersistentVolume::whereHasMorph('resource', $dbClasses, fn ($q) => $q->whereHas('environment.project', fn ($p) => $p->where('team_id', $team->id)))->count();
+    $serviceVolumes = \App\Models\LocalPersistentVolume::whereHasMorph('resource', [
+        \App\Models\ServiceApplication::class,
+        \App\Models\ServiceDatabase::class,
+    ], fn ($q) => $q->whereHas('service.environment.project', fn ($p) => $p->where('team_id', $team->id)))->count();
+
+    $volumesCount = $appVolumes + $dbVolumes + $serviceVolumes;
 
     $limits = teamResourceLimits($team);
 
@@ -254,6 +328,111 @@ function teamStorageUsage(?Team $team = null): array
         'is_unlimited' => $limits['storage_gb'] === null,
         'max_volumes' => $limits['max_volumes'] ?? 10,
     ];
+}
+
+function canTeamCreateVolume(?Team $team = null): bool
+{
+    $team = $team ?? currentTeam();
+    if (! $team || $team->id === 0) {
+        return true;
+    }
+
+    $usage = teamStorageUsage($team);
+    if ($usage['is_unlimited']) {
+        return true;
+    }
+
+    return $usage['volumes_count'] < ($usage['max_volumes'] ?? 10);
+}
+
+function countTeamRunningResources(?Team $team = null): int
+{
+    $team = $team ?? currentTeam();
+    if (! $team) {
+        return 0;
+    }
+
+    $dbClasses = [
+        \App\Models\StandalonePostgresql::class,
+        \App\Models\StandaloneMysql::class,
+        \App\Models\StandaloneMariadb::class,
+        \App\Models\StandaloneMongodb::class,
+        \App\Models\StandaloneRedis::class,
+        \App\Models\StandaloneKeydb::class,
+        \App\Models\StandaloneDragonfly::class,
+        \App\Models\StandaloneClickhouse::class,
+    ];
+
+    $runningApps = \App\Models\Application::whereHas('environment.project', fn ($q) => $q->where('team_id', $team->id))
+        ->where('status', 'like', 'running%')
+        ->count();
+
+    $runningDbs = 0;
+    foreach ($dbClasses as $dbClass) {
+        $runningDbs += $dbClass::whereHas('environment.project', fn ($q) => $q->where('team_id', $team->id))
+            ->where('status', 'like', '%running%')
+            ->count();
+    }
+
+    $runningServices = \App\Models\Service::whereHas('environment.project', fn ($q) => $q->where('team_id', $team->id))
+        ->where(function ($query) {
+            $query->whereHas('applications', fn ($q) => $q->where('status', 'like', '%running%'))
+                ->orWhereHas('databases', fn ($q) => $q->where('status', 'like', '%running%'));
+        })
+        ->count();
+
+    return $runningApps + $runningDbs + $runningServices;
+}
+
+function checkResourceLimitForDeployment(?Team $team = null, mixed $resource = null): array
+{
+    $team = $team ?? currentTeam();
+    if (! $team || $team->id === 0) {
+        return ['allowed' => true];
+    }
+
+    if (! isSubscriptionActive($team) && ! isSubscriptionOnGracePeriod()) {
+        return [
+            'allowed' => false,
+            'reason' => 'subscription_required',
+            'title' => 'Subscription Required',
+            'message' => 'Your subscription or free trial has expired. Please choose a plan to continue deploying resources.',
+            'plan_name' => 'Expired',
+            'max_allowed' => 0,
+            'currently_running' => countTeamRunningResources($team),
+            'upgrade_url' => route('subscription.show'),
+        ];
+    }
+
+    $limits = teamResourceLimits($team);
+    $maxAllowed = (int) ($limits['max_apps'] ?? 0);
+
+    // <= 0 means unlimited resources (e.g. business plan)
+    if ($maxAllowed <= 0) {
+        return ['allowed' => true];
+    }
+
+    // If this resource is already running, restarting/redeploying it doesn't add a new running resource
+    if ($resource && method_exists($resource, 'isRunning') && $resource->isRunning()) {
+        return ['allowed' => true];
+    }
+
+    $currentlyRunning = countTeamRunningResources($team);
+
+    if ($currentlyRunning >= $maxAllowed) {
+        return [
+            'allowed' => false,
+            'reason' => 'limit_reached',
+            'title' => 'Active Resource Limit Reached',
+            'message' => "Your team has reached the maximum allowed running resources for the {$limits['name']} plan ({$currentlyRunning} of {$maxAllowed} running). Any further deploy or start attempts will be blocked until you upgrade your plan or stop existing resources.",
+            'plan_name' => $limits['name'],
+            'max_allowed' => $maxAllowed,
+            'currently_running' => $currentlyRunning,
+            'upgrade_url' => route('subscription.show'),
+        ];
+    }
+
+    return ['allowed' => true];
 }
 
 function isSubscriptionActive(?Team $team = null): bool

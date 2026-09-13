@@ -103,14 +103,30 @@ class Heading extends Component
 
             $team = currentTeam();
             if ($team && $team->id !== 0) {
-                $limits = teamResourceLimits($team);
-                if ($limits['max_apps'] > 0) {
-                    $activeAppsCount = Application::ownedByCurrentTeam()->where('status', 'running')->count();
-                    if ($activeAppsCount >= $limits['max_apps'] && $this->application->status !== 'running') {
-                        $this->dispatch('error', 'Plan limit reached', "Your {$limits['name']} plan allows up to {$limits['max_apps']} running applications. Please upgrade your plan to run more.");
+                if (function_exists('checkResourceLimitForDeployment')) {
+                    $check = checkResourceLimitForDeployment($team, $this->application);
+                    if (! ($check['allowed'] ?? false)) {
+                        $this->dispatch('open-plan-limit-modal', $check);
 
                         return;
                     }
+                }
+
+                $needsSave = false;
+                $planCpu = (float) ($limits['cpus'] ?? 0);
+                $appCpu = (float) ($this->application->limits_cpus ?? 0);
+                if ($planCpu > 0 && ($appCpu == 0 || $appCpu > $planCpu)) {
+                    $this->application->limits_cpus = (string) $limits['cpus'];
+                    $needsSave = true;
+                }
+
+                if (function_exists('isMemoryLimitExceeded') && isMemoryLimitExceeded($this->application->limits_memory, $limits['memory'])) {
+                    $this->application->limits_memory = (string) $limits['memory'];
+                    $needsSave = true;
+                }
+
+                if ($needsSave) {
+                    $this->application->save();
                 }
             }
 

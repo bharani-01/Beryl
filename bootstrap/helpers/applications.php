@@ -29,6 +29,17 @@ function queue_application_deployment(Application $application, string $deployme
         $destination_id = $destination->id;
     }
 
+    $team = $application->environment?->project?->team ?? currentTeam();
+    if ($team && $team->id !== 0 && function_exists('checkResourceLimitForDeployment')) {
+        $check = checkResourceLimitForDeployment($team, $application);
+        if (! ($check['allowed'] ?? true)) {
+            return [
+                'status' => 'limit_reached',
+                'message' => $check['message'] ?? 'Active resource limit reached.',
+            ];
+        }
+    }
+
     // Check if the deployment queue is full for this server
     $serverForQueueCheck = $server ?? Server::find($server_id);
     $queue_limit = $serverForQueueCheck->settings->deployment_queue_limit ?? 25;

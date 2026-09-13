@@ -18,6 +18,14 @@ class StartService
 
     public function handle(Service $service, bool $pullLatestImages = false, bool $stopBeforeStart = false)
     {
+        $team = currentTeam() ?? $service->environment?->project?->team;
+        if ($team && $team->id !== 0 && function_exists('checkResourceLimitForDeployment')) {
+            $check = checkResourceLimitForDeployment($team, $service);
+            if (! ($check['allowed'] ?? false)) {
+                throw new \RuntimeException($check['message'] ?? 'Active resource limit reached.');
+            }
+        }
+
         $service->parse();
         if ($this->shouldStopBeforeStarting($pullLatestImages, $stopBeforeStart)) {
             StopService::run(service: $service, dockerCleanup: false);

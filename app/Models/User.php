@@ -574,6 +574,10 @@ class User extends Authenticatable implements SendsEmail
      */
     public function isAdminOfTeam(int $teamId): bool
     {
+        if ($this->id === 0 || $this->isInstanceAdmin()) {
+            return true;
+        }
+
         $team = $this->teams->where('id', $teamId)->first();
 
         if (! $team) {

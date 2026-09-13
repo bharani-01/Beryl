@@ -20,8 +20,9 @@ FILES_TO_DEPLOY = [
     "database/migrations/2026_09_13_131000_add_recent_locations_to_users_table.php",
     "database/migrations/2026_09_13_132000_add_device_and_geo_to_forensic_audit_logs.php",
 
-    # Exceptions
+    # Exceptions & Traits
     "app/Exceptions/SecurityException.php",
+    "app/Traits/HasPlanResourceLimits.php",
 
     # Models
     "app/Models/ApiLog.php",
@@ -32,6 +33,14 @@ FILES_TO_DEPLOY = [
     "app/Models/Subscription.php",
     "app/Models/Team.php",
     "app/Models/User.php",
+    "app/Models/StandalonePostgresql.php",
+    "app/Models/StandaloneMysql.php",
+    "app/Models/StandaloneMariadb.php",
+    "app/Models/StandaloneMongodb.php",
+    "app/Models/StandaloneRedis.php",
+    "app/Models/StandaloneKeydb.php",
+    "app/Models/StandaloneDragonfly.php",
+    "app/Models/StandaloneClickhouse.php",
 
     # Services (Forensic Audit Subsystem & Location Engine)
     "app/Services/Audit/AuditCanonicalSerializer.php",
@@ -56,17 +65,23 @@ FILES_TO_DEPLOY = [
 
     # Controllers & Routes
     "app/Http/Controllers/Webhook/Razorpay.php",
+    "app/Http/Controllers/Api/ApplicationsController.php",
+    "app/Http/Controllers/Api/DatabasesController.php",
+    "app/Http/Controllers/Api/ServicesController.php",
     "routes/webhooks.php",
     "routes/web.php",
     "routes/channels.php",
 
     # Actions
     "app/Actions/Fortify/CreateNewUser.php",
+    "app/Actions/Service/StartService.php",
+    "app/Actions/Database/StartDatabase.php",
 
     # Helpers & Providers
     "bootstrap/helpers/shared.php",
     "bootstrap/helpers/audit.php",
     "bootstrap/helpers/subscriptions.php",
+    "bootstrap/helpers/applications.php",
     "app/Providers/EventServiceProvider.php",
     "app/Providers/AppServiceProvider.php",
     "app/Providers/FortifyServiceProvider.php",
@@ -82,6 +97,14 @@ FILES_TO_DEPLOY = [
     "resources/views/livewire/subscription/pricing-plans.blade.php",
     "app/Livewire/Subscription/Actions.php",
     "resources/views/livewire/subscription/actions.blade.php",
+    "app/Livewire/Project/Shared/ResourceLimits.php",
+    "app/Livewire/Project/Application/Heading.php",
+    "app/Livewire/Project/Database/Heading.php",
+    "app/Livewire/Project/Service/Heading.php",
+    "app/Livewire/Project/New/Select.php",
+    "resources/views/livewire/project/new/select.blade.php",
+    "app/Livewire/Project/Resource/Create.php",
+    "resources/views/components/plan-limit-modal.blade.php",
     "resources/views/components/navbar.blade.php",
     "resources/views/components/reicon.blade.php",
     "resources/views/layouts/app.blade.php",
@@ -94,6 +117,7 @@ FILES_TO_DEPLOY = [
     # Tests
     "tests/Feature/AuditLogsIconConsistencyTest.php",
     "tests/Feature/Subscription/RazorpayPaymentValidationTest.php",
+    "tests/Feature/Subscription/ResourceAndStorageLimitsTest.php",
     "tests/Feature/AdminUserRoleAndTeamTest.php",
     "tests/Feature/ForensicAudit/ForensicAuditChainTest.php",
     "tests/Feature/ForensicAudit/ForensicAuditRedactionTest.php",
@@ -190,8 +214,11 @@ if test_res.stderr:
 print("\n=== RUNNING FORENSIC AUDIT SUBSYSTEM TESTS ON EC2 ===", flush=True)
 audit_test_res = run_ssh("sudo docker exec coolify php artisan test --compact tests/Feature/ForensicAudit/")
 print(audit_test_res.stdout)
-if audit_test_res.stderr:
-    print(audit_test_res.stderr)
+print("\n=== RUNNING RESOURCE & STORAGE LIMITS TESTS ON EC2 ===", flush=True)
+limits_test_res = run_ssh("sudo docker exec coolify php artisan test --compact tests/Feature/Subscription/ResourceAndStorageLimitsTest.php")
+print(limits_test_res.stdout)
+if limits_test_res.stderr:
+    print(limits_test_res.stderr)
 
 print("\n=== DEPLOYMENT TO AWS COMPLETED ===", flush=True)
 

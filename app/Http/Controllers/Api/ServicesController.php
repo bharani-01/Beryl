@@ -2516,6 +2516,15 @@ class ServicesController extends Controller
                 ], 422);
             }
 
+            $team = currentTeam() ?? $service->environment?->project?->team;
+            if (function_exists('canTeamCreateVolume') && ! canTeamCreateVolume($team)) {
+                $usage = teamStorageUsage($team);
+
+                return response()->json([
+                    'message' => "Volume limit reached. Your workspace allows up to {$usage['max_volumes']} persistent volumes ({$usage['storage_limit_formatted']} storage quota). Please upgrade your plan to add more volumes.",
+                ], 422);
+            }
+
             $storage = LocalPersistentVolume::create([
                 'name' => $subResource->uuid.'-'.$request->name,
                 'mount_path' => $request->mount_path,

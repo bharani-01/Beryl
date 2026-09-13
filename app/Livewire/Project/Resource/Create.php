@@ -19,6 +19,15 @@ class Create extends Component
     {
         $this->authorize('createAnyResource');
 
+        if (function_exists('checkResourceLimitForDeployment')) {
+            $check = checkResourceLimitForDeployment(currentTeam());
+            if (! ($check['allowed'] ?? true)) {
+                session()->flash('error', $check['message'] ?? 'Your team has reached the active resource limit. Please upgrade your plan to deploy new resources.');
+
+                return redirect()->route('subscription.show');
+            }
+        }
+
         $type = str(request()->query('type'));
         $destination_uuid = request()->query('destination');
         $database_image = request()->query('database_image');

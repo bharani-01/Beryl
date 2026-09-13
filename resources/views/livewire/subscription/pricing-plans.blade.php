@@ -4,6 +4,9 @@
     $currentPlanKey = $currentLimits['plan'] ?? 'trial';
     $isOnTrial = isTeamOnTrial();
     $daysLeft = trialDaysRemaining();
+    $runningResources = function_exists('countTeamRunningResources') ? countTeamRunningResources() : 0;
+    $maxApps = (int) ($currentLimits['max_apps'] ?? 0);
+    $isResourceLimitReached = ($maxApps > 0) && ($runningResources >= $maxApps);
 @endphp
 
 <div x-data="{ selected: 'monthly' }"
@@ -164,9 +167,16 @@
                                 {{ $plan['badge'] }}
                             </span>
                             @if ($isCurrent)
-                                <span class="rounded bg-coollabs/10 px-1.5 py-0.5 text-[10px] font-semibold text-coollabs dark:bg-warning/15 dark:text-warning">
-                                    Current
-                                </span>
+                                <div class="flex items-center gap-1.5">
+                                    <span class="rounded bg-coollabs/10 px-1.5 py-0.5 text-[10px] font-semibold text-coollabs dark:bg-warning/15 dark:text-warning">
+                                        Current
+                                    </span>
+                                    @if ($isResourceLimitReached)
+                                        <span class="rounded bg-rose-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-rose-600 dark:text-rose-400">
+                                            Limit reached
+                                        </span>
+                                    @endif
+                                </div>
                             @elseif ($isPopular)
                                 <span class="rounded bg-neutral-200/70 px-1.5 py-0.5 text-[10px] font-semibold text-neutral-700 dark:bg-white/10 dark:text-neutral-200">
                                     Popular
@@ -209,6 +219,12 @@
                             @endif
                         </p>
 
+                        @if ($isCurrent && $isResourceLimitReached)
+                            <div class="mt-2 rounded-md bg-rose-500/10 px-2 py-1 text-[11px] font-medium text-rose-600 dark:bg-rose-500/15 dark:text-rose-400">
+                                {{ $runningResources }} of {{ $maxApps }} resources running (capacity reached)
+                            </div>
+                        @endif
+
                         {{-- Feature list --}}
                         <div class="mt-4 divide-y divide-neutral-200 border-t border-neutral-200 pt-3 dark:divide-white/[0.07] dark:border-white/[0.07]">
                             @foreach ($plan['features'] as $feature)
@@ -225,6 +241,8 @@
                             <x-forms.button class="w-full justify-center" disabled>
                                 @if ($key === 'trial')
                                     Active trial ({{ $daysLeft }}d left)
+                                @elseif ($isResourceLimitReached)
+                                    Current plan (limit reached)
                                 @else
                                     Current plan
                                 @endif

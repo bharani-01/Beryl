@@ -58,6 +58,26 @@ class Actions extends Component
 
     public int $trialDaysLeft = 0;
 
+    public int $runningResources = 0;
+
+    public int $maxApps = 0;
+
+    public bool $isResourceLimitReached = false;
+
+    public int $volumesCount = 0;
+
+    public int $maxVolumes = 0;
+
+    public bool $isVolumeLimitReached = false;
+
+    public int $databasesCount = 0;
+
+    public string $cpuLimit = '1.0';
+
+    public string $memoryLimit = '1G';
+
+    public string $storageLimit = '20 GB';
+
     public function mount(): void
     {
         $team = currentTeam();
@@ -84,7 +104,7 @@ class Actions extends Component
         if (function_exists('teamResourceLimits')) {
             $this->resourceLimits = teamResourceLimits($team);
         } else {
-            $this->resourceLimits = ['plan' => 'starter', 'cpu' => '1.0', 'memory' => '1G', 'storage' => '20 GB', 'max_apps' => 3, 'max_volumes' => 5];
+            $this->resourceLimits = ['plan' => 'starter', 'name' => 'Starter', 'cpu' => '1.0', 'memory' => '1G', 'storage' => '20 GB', 'max_apps' => 3, 'max_volumes' => 5];
         }
 
         if (function_exists('teamStorageUsage')) {
@@ -101,6 +121,19 @@ class Actions extends Component
             $this->planName = 'Starter';
             $this->planPrice = '₹499';
         }
+
+        $this->runningResources = function_exists('countTeamRunningResources') ? countTeamRunningResources($team) : 0;
+        $this->maxApps = (int) ($this->resourceLimits['max_apps'] ?? 0);
+        $this->isResourceLimitReached = ($this->maxApps > 0) && ($this->runningResources >= $this->maxApps);
+
+        $this->volumesCount = (int) ($this->storageUsage['volumes_count'] ?? 0);
+        $this->maxVolumes = (int) ($this->storageUsage['max_volumes'] ?? ($this->resourceLimits['max_volumes'] ?? 10));
+        $this->isVolumeLimitReached = ($this->maxVolumes > 0) && ($this->volumesCount >= $this->maxVolumes);
+
+        $this->databasesCount = (int) ($this->storageUsage['databases_count'] ?? 0);
+        $this->cpuLimit = (string) ($this->resourceLimits['cpu'] ?? '1.0');
+        $this->memoryLimit = (string) ($this->resourceLimits['memory'] ?? '1G');
+        $this->storageLimit = (string) ($this->storageUsage['storage_limit_formatted'] ?? ($this->resourceLimits['storage'] ?? '20 GB'));
     }
 
     public function loadPricePreview(int $quantity): void

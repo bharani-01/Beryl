@@ -115,6 +115,17 @@ class Heading extends Component
     {
         try {
             $this->authorizeService('deploy');
+
+            $team = currentTeam() ?? $this->service->environment?->project?->team;
+            if (function_exists('checkResourceLimitForDeployment')) {
+                $check = checkResourceLimitForDeployment($team, $this->service);
+                if (! ($check['allowed'] ?? false)) {
+                    $this->dispatch('open-plan-limit-modal', $check);
+
+                    return;
+                }
+            }
+
             $activity = StartService::run($this->service, pullLatestImages: true);
             $this->js("window.dispatchEvent(new CustomEvent('startservice'))");
             $this->dispatch('activityMonitor', $activity->id);
@@ -127,6 +138,17 @@ class Heading extends Component
     {
         try {
             $this->authorizeService('deploy');
+
+            $team = currentTeam() ?? $this->service->environment?->project?->team;
+            if (function_exists('checkResourceLimitForDeployment')) {
+                $check = checkResourceLimitForDeployment($team, $this->service);
+                if (! ($check['allowed'] ?? false)) {
+                    $this->dispatch('open-plan-limit-modal', $check);
+
+                    return;
+                }
+            }
+
             $activities = Activity::where('properties->type_uuid', $this->service->uuid)
                 ->where(function ($q) {
                     $q->where('properties->status', ProcessStatus::IN_PROGRESS->value)

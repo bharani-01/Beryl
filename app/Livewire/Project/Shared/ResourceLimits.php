@@ -131,6 +131,28 @@ class ResourceLimits extends Component
 
                     return;
                 }
+
+                if (function_exists('isMemoryLimitExceeded') && isMemoryLimitExceeded($this->limitsMemory, $limits['memory'])) {
+                    $this->dispatch('error', 'Memory limit exceeded', "Your {$limits['name']} plan allows a maximum of {$limits['memory']} RAM. Please upgrade your plan to increase memory limits.");
+
+                    return;
+                }
+
+                if (function_exists('isMemoryLimitExceeded') && ! empty($this->limitsMemoryReservation) && $this->limitsMemoryReservation !== '0') {
+                    if (isMemoryLimitExceeded($this->limitsMemoryReservation, $limits['memory'])) {
+                        $this->dispatch('error', 'Soft memory limit exceeded', "Your {$limits['name']} plan allows a maximum memory reservation of {$limits['memory']}.");
+
+                        return;
+                    }
+
+                    $reservationBytes = parseMemoryStringToBytes($this->limitsMemoryReservation);
+                    $memoryBytes = parseMemoryStringToBytes($this->limitsMemory);
+                    if ($reservationBytes && $memoryBytes && $reservationBytes > $memoryBytes) {
+                        $this->dispatch('error', 'Soft memory limit invalid', 'Soft memory limit (reservation) cannot exceed the maximum memory limit.');
+
+                        return;
+                    }
+                }
             }
 
             $this->syncData(true);

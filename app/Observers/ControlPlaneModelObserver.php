@@ -97,9 +97,18 @@ class ControlPlaneModelObserver
         } elseif ($modelClass === 'Team') {
             $organizationId = $model->id;
         } elseif (method_exists($model, 'team')) {
-            $organizationId = $model->team?->id;
+            try {
+                $team = $model->team();
+                $organizationId = is_object($team) ? data_get($team, 'id') : null;
+            } catch (\Throwable) {
+                $organizationId = null;
+            }
         } elseif (method_exists($model, 'currentTeam')) {
             $organizationId = $model->currentTeam()?->id;
+        }
+
+        if (! $organizationId) {
+            $organizationId = data_get($model, 'environment.project.team_id') ?? data_get($model, 'project.team_id');
         }
 
         $targetName = $model->name ?? ($model->description ?? ($model->key ?? $model->uuid ?? null));

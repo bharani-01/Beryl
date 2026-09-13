@@ -1,5 +1,24 @@
 <div class="application-settings-form" x-data x-init="$wire.loadServers">
     <div x-data="searchResources()" x-init="init()">
+        @if ($isResourceLimitReached)
+            <div class="mb-5 rounded-xl border border-danger/30 bg-danger/10 p-4 text-danger">
+                <div class="flex items-start justify-between gap-4 flex-wrap sm:flex-nowrap">
+                    <div class="flex items-start gap-3">
+                        <x-reicon name="alert-circle" class="mt-0.5 size-5 shrink-0 text-danger" />
+                        <div>
+                            <h4 class="font-semibold text-danger">Active Resource Limit Reached ({{ $resourceLimitCheck['currently_running'] ?? 0 }} of {{ $resourceLimitCheck['max_allowed'] ?? 0 }} running)</h4>
+                            <p class="mt-1 text-xs text-neutral-600 dark:text-neutral-300 leading-relaxed">
+                                Your team has reached the maximum allowed running resources for the <strong>{{ $resourceLimitCheck['plan_name'] ?? 'current' }}</strong> plan. Any further deploy or start attempts are blocked until you upgrade your plan or stop existing resources.
+                            </p>
+                        </div>
+                    </div>
+                    <a href="{{ route('subscription.show') }}" class="button button-danger shrink-0 text-xs font-semibold self-center sm:self-start">
+                        <x-reicon name="subscription" class="size-3.5" />
+                        Upgrade Plan
+                    </a>
+                </div>
+            </div>
+        @endif
         @if ($isOutOfCapacity)
             <div class="mb-5 rounded-xl border border-warning/30 bg-warning/10 p-4 text-warning">
                 <div class="flex items-start gap-3">
@@ -372,6 +391,8 @@
 
                 function searchResources() {
                     return {
+                        isResourceLimitReached: @js($isResourceLimitReached),
+                        resourceLimitCheck: @js($resourceLimitCheck),
                         search: '',
                         resourceType: 'all',
                         resourceTypeOptions: [{
@@ -548,6 +569,10 @@
                         docLinkCache: {}, // Cache resolved doc URLs: { serviceName: url | null }
                         docCheckInProgress: {}, // Track ongoing checks: { serviceName: boolean }
                         setType(type) {
+                            if (this.isResourceLimitReached) {
+                                window.dispatchEvent(new CustomEvent('open-plan-limit-modal', { detail: this.resourceLimitCheck }));
+                                return;
+                            }
                             if (this.selecting) return;
                             this.selecting = true;
                             this.$wire.setType(type);
