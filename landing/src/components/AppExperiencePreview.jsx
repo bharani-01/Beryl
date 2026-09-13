@@ -15,7 +15,7 @@ export default function AppExperiencePreview() {
           Serene, tactile, and intentionally calm.
         </h2>
         <p className="mt-3 text-sm sm:text-base text-[#78716C] max-w-md mx-auto">
-          No blinking sirens or alarmist red alerts. Just clean, quiet clarity over what matters.
+          Deploy free open-source tools and databases with one tap. No blinking sirens or alarmist alerts.
         </p>
       </div>
 
@@ -85,29 +85,29 @@ export default function AppExperiencePreview() {
             {/* Central peaceful dashboard widget */}
             <div className="space-y-3 text-left">
               <div className="rounded-3xl border border-stone-100 bg-[#FDFCF8] p-4">
-                <span className="text-[10.5px] font-medium text-stone-400 uppercase">System Rhythm</span>
+                <span className="text-[10.5px] font-medium text-stone-400 uppercase">Open-Source Rhythm</span>
                 <p className="text-2xl font-bold text-[#292524] mt-0.5">3 of 3 Active</p>
                 <div className="mt-2.5 flex items-center gap-1.5 text-xs text-stone-500">
                   <span className="size-1.5 rounded-full bg-emerald-500"></span>
-                  <span>All microservices healthy</span>
+                  <span>Supabase, Ghost & Postgres live</span>
                 </div>
               </div>
 
               {/* Resource cards */}
               <div className="rounded-2xl border border-stone-100 p-3 bg-white">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="font-semibold text-[#292524]">nextjs-storefront</span>
+                  <span className="font-semibold text-[#292524]">supabase-auth-db</span>
                   <span className="text-emerald-600 font-medium text-[10.5px]">Running</span>
                 </div>
-                <span className="text-[10.5px] text-stone-400">store.trackifyapp.co.in</span>
+                <span className="text-[10.5px] text-stone-400">auth.trackifyapp.co.in</span>
               </div>
 
               <div className="rounded-2xl border border-stone-100 p-3 bg-white">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="font-semibold text-[#292524]">supabase-backend</span>
+                  <span className="font-semibold text-[#292524]">ghost-publishing</span>
                   <span className="text-emerald-600 font-medium text-[10.5px]">Running</span>
                 </div>
-                <span className="text-[10.5px] text-stone-400">db.trackifyapp.co.in</span>
+                <span className="text-[10.5px] text-stone-400">blog.trackifyapp.co.in</span>
               </div>
             </div>
           </div>

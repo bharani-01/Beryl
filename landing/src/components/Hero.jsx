@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowRight, Sparkles } from 'lucide-react';
+import { ArrowRight, Sparkles, Layers } from 'lucide-react';
 
 export default function Hero() {
   return (
@@ -17,24 +17,24 @@ export default function Hero() {
 
       <div className="relative mx-auto max-w-4xl px-4 sm:px-6">
         
-        {/* Ambient indicator */}
+        {/* Ambient indicator emphasizing free open-source software */}
         <div className="inline-flex items-center gap-2 rounded-full border border-stone-200/80 bg-white/80 px-3.5 py-1 text-xs font-medium text-[#78716C] shadow-sm backdrop-blur-md mb-8">
           <span className="size-2 rounded-full bg-[#FFB7B2]"></span>
-          <span>A calm PaaS platform for independent builders</span>
+          <span>Deploy any free open-source software with 1-click</span>
         </div>
 
         {/* Headline: 72px Outfit with cursive Reenie Beanie word */}
         <h1 className="text-4xl sm:text-6xl md:text-[72px] font-medium tracking-tight text-[#292524] leading-[1.08] max-w-3xl mx-auto">
-          Hosting your apps, made delightfully{' '}
+          Deploy any free{' '}
           <span className="font-cursive text-5xl sm:text-7xl md:text-[86px] text-[#FFB7B2] font-normal inline-block transform -rotate-2 -translate-y-1 mx-1.5">
-            calm
+            open-source
           </span>
-          and sovereign.
+          software, with peace of mind.
         </h1>
 
         {/* Sub-headline max-width 500px */}
-        <p className="mt-6 text-base sm:text-lg text-[#78716C] leading-relaxed max-w-[500px] mx-auto font-normal">
-          A gentle digital living room for your websites, databases, and microservices. Run on your own servers with zero vendor anxiety.
+        <p className="mt-6 text-base sm:text-lg text-[#78716C] leading-relaxed max-w-[520px] mx-auto font-normal">
+          From Supabase and Ghost to WordPress and Postgres. Launch 300+ free open-source software stacks and custom apps on your own servers with zero vendor lock-in.
         </p>
 
         {/* Dual CTA buttons */}
@@ -43,25 +43,26 @@ export default function Hero() {
             href="/login"
             className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-full bg-[#FFB7B2] px-8 py-3.5 text-[15px] font-medium text-[#292524] shadow-[0_4px_20px_-2px_rgba(255,183,178,0.5)] hover:shadow-[0_8px_25px_-2px_rgba(255,183,178,0.7)] hover:scale-[1.02] active:scale-[0.98] transition-all"
           >
-            <span>Start your space</span>
+            <span>Deploy open source</span>
             <ArrowRight className="size-4 text-[#292524]/80" />
           </a>
 
           <a
-            href="/login"
+            href="#templates"
             className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-full border border-stone-200 bg-white px-8 py-3.5 text-[15px] font-medium text-[#292524] hover:bg-stone-50 hover:border-stone-300 transition-all shadow-sm"
           >
-            <span>Explore console</span>
+            <Layers className="size-4 text-stone-400" />
+            <span>Browse 300+ software</span>
           </a>
         </div>
 
         {/* Quiet micro-details */}
         <div className="mt-10 flex items-center justify-center gap-6 text-xs text-[#78716C]">
-          <span>No credit card required</span>
+          <span>300+ free open-source software</span>
           <span className="text-stone-300">•</span>
-          <span>Self-host on any server</span>
+          <span>1-click automatic SSL</span>
           <span className="text-stone-300">•</span>
-          <span>1-click open source</span>
+          <span>Zero cloud markups</span>
         </div>
 
       </div>

@@ -17,7 +17,8 @@ export default function Navigation() {
         </a>
 
         {/* Text links in 14px Outfit Medium */}
-        <div className="hidden md:flex items-center gap-7 text-[14px] font-medium text-[#78716C]">
+        <div className="hidden md:flex items-center gap-6 text-[14px] font-medium text-[#78716C]">
+          <a href="#templates" className="hover:text-[#292524] transition-colors">Open source</a>
           <a href="#experience" className="hover:text-[#292524] transition-colors">Experience</a>
           <a href="#scenarios" className="hover:text-[#292524] transition-colors">Moments</a>
           <a href="#testimonials" className="hover:text-[#292524] transition-colors">Stories</a>
@@ -58,6 +59,7 @@ export default function Navigation() {
       {mobileMenuOpen && (
         <div className="mt-2 rounded-3xl border border-stone-200/60 bg-white/95 p-5 shadow-lg backdrop-blur-xl md:hidden space-y-4">
           <div className="flex flex-col space-y-3 text-[14px] font-medium text-[#78716C]">
+            <a href="#templates" onClick={() => setMobileMenuOpen(false)} className="hover:text-[#292524]">Open source</a>
             <a href="#experience" onClick={() => setMobileMenuOpen(false)} className="hover:text-[#292524]">Experience</a>
             <a href="#scenarios" onClick={() => setMobileMenuOpen(false)} className="hover:text-[#292524]">Moments</a>
             <a href="#testimonials" onClick={() => setMobileMenuOpen(false)} className="hover:text-[#292524]">Stories</a>

@@ -129,21 +129,41 @@ FILES_TO_DEPLOY = [
     "app/Livewire/Team/AdminView.php",
     "app/Livewire/Terminal/Index.php",
 
+    # Middleware, Controllers & Livewire extras
+    "app/Http/Controllers/OauthController.php",
+    "app/Http/Middleware/RedirectIfAuthenticated.php",
+    "app/Livewire/Dashboard/ActiveDeployments.php",
+    "app/Livewire/DeploymentsIndicator.php",
+    "app/Livewire/Project/Application/Domains.php",
+    "app/Livewire/Project/Service/Storage.php",
+
     # Blade Views & Layouts
     "resources/views/landing.blade.php",
     "resources/views/layouts/app.blade.php",
     "resources/views/layouts/base.blade.php",
+    "resources/views/layouts/simple.blade.php",
+    "resources/views/components/auth/shell.blade.php",
     "resources/views/components/navbar.blade.php",
     "resources/views/components/top-breadcrumb.blade.php",
     "resources/views/components/top-user-menu.blade.php",
     "resources/views/components/reicon.blade.php",
     "resources/views/components/version.blade.php",
     "resources/views/components/plan-limit-modal.blade.php",
+    "resources/views/components/table/filter.blade.php",
     "resources/views/components/application/configuration-sidebar.blade.php",
     "resources/views/components/database/configuration-sidebar.blade.php",
     "resources/views/components/shared-variables/layout.blade.php",
+    "resources/views/auth/login.blade.php",
+    "resources/views/auth/register.blade.php",
+    "resources/views/auth/forgot-password.blade.php",
+    "resources/views/auth/reset-password.blade.php",
+    "resources/views/auth/confirm-password.blade.php",
+    "resources/views/auth/two-factor-challenge.blade.php",
+    "resources/views/auth/verify-email.blade.php",
+    "resources/views/invitation/accept.blade.php",
     "resources/views/livewire/dashboard.blade.php",
     "resources/views/livewire/admin/index.blade.php",
+    "resources/views/livewire/boarding/index.blade.php",
     "resources/views/livewire/subscription/show.blade.php",
     "resources/views/livewire/subscription/index.blade.php",
     "resources/views/livewire/subscription/pricing-plans.blade.php",
@@ -151,6 +171,8 @@ FILES_TO_DEPLOY = [
     "resources/views/livewire/project/new/select.blade.php",
     "resources/views/livewire/project/resource/index.blade.php",
     "resources/views/livewire/project/shared/resource-operations.blade.php",
+    "resources/views/livewire/project/application/domains.blade.php",
+    "resources/views/livewire/server/navbar.blade.php",
     "resources/views/livewire/server/show.blade.php",
     "resources/views/livewire/server/partials/server-details.blade.php",
     "resources/views/livewire/server/partials/server-live-monitor.blade.php",
@@ -164,6 +186,7 @@ FILES_TO_DEPLOY = [
     "public/beryl-logo.svg",
 
     # Config
+    "config/app.php",
     "config/services.php",
 
     # Tests

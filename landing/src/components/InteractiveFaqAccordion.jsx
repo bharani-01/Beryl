@@ -3,23 +3,27 @@ import { Plus } from 'lucide-react';
 
 const FAQS = [
   {
+    q: 'Can I really deploy any free open-source software on Beryl?',
+    a: 'Yes! Beryl includes an instant 1-click catalog of over 300 free open-source software stacks—from Supabase and WordPress to Ghost, Plausible Analytics, Nextcloud, and n8n. Pick any software, click launch, and Beryl provisions the Docker containers, persistent storage volumes, Traefik reverse proxy routing, and Let\'s Encrypt SSL certificates automatically.',
+  },
+  {
     q: 'How does Beryl connect to my servers?',
     a: 'Beryl connects securely over SSH using standard private key authentication. There is no heavy background agent or proprietary daemon required on your host machine.',
   },
   {
-    q: 'Can I host multiple applications and databases on one VPS?',
-    a: 'Yes. Beryl manages Traefik reverse proxy routing and Docker containers automatically, allowing you to run dozens of domains, databases, and microservices on a single affordable server.',
+    q: 'Can I host multiple open-source apps and databases on one VPS?',
+    a: 'Yes. Beryl manages Traefik reverse proxy routing and Docker containers automatically, allowing you to run dozens of domains, open-source services, databases, and microservices on a single affordable server.',
   },
   {
     q: 'What happens if my server experiences a power cycle or reboot?',
-    a: 'Every container orchestrated by Beryl is configured with continuous restart policies. When your server reboots, Traefik, your web apps, and databases resume automatically within seconds.',
+    a: 'Every container orchestrated by Beryl is configured with continuous restart policies. When your server reboots, Traefik, your open-source tools, and databases resume automatically within seconds.',
   },
   {
     q: 'How does the Starter plan resource limit work?',
-    a: 'The Starter plan allows up to 3 concurrently running resources (applications, databases, or services) with 1 vCPU and 1GB RAM per container. You can add more resources, and simply start/stop them whenever needed.',
+    a: 'The Starter plan allows up to 3 concurrently running resources (applications, databases, or open-source services) with 1 vCPU and 1GB RAM per container. You can add more resources, and simply start/stop them whenever needed.',
   },
   {
-    q: 'Are automated backups included?',
+    q: 'Are automated backups included for open-source databases?',
     a: 'Yes. You can connect any S3-compatible storage provider (Cloudflare R2, AWS S3, MinIO, or Backblaze) and enable automated hourly or daily snapshot schedules with 1-click restore.',
   },
 ];
@@ -44,7 +48,7 @@ export default function InteractiveFaqAccordion() {
             Frequently answered questions
           </h2>
           <p className="text-sm text-[#78716C] mt-2">
-            Everything you need to know about self-hosting calmly with Beryl.
+            Everything you need to know about self-hosting free open-source software calmly with Beryl.
           </p>
         </div>
 

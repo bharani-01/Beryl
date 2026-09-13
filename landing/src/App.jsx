@@ -1,25 +1,36 @@
 import React from 'react';
-import Navbar from './components/Navbar';
+import GrainOverlay from './components/GrainOverlay';
+import Navigation from './components/Navigation';
 import Hero from './components/Hero';
-import ArchitectureFlow from './components/ArchitectureFlow';
-import FeaturesGrid from './components/FeaturesGrid';
-import InteractiveLivePreview from './components/InteractiveLivePreview';
+import HorizontalScenarioScroll from './components/HorizontalScenarioScroll';
 import SupportedTemplates from './components/SupportedTemplates';
-import PricingCalculator from './components/PricingCalculator';
+import AppExperiencePreview from './components/AppExperiencePreview';
+import DiaryTestimonials from './components/DiaryTestimonials';
+import InteractiveFaqAccordion from './components/InteractiveFaqAccordion';
+import WaitlistConversion from './components/WaitlistConversion';
 import Footer from './components/Footer';
 
 export default function App() {
   return (
-    <div className="min-h-screen bg-[#07090e] text-[#e2e8f0] selection:bg-emerald-500/20 selection:text-emerald-300">
-      <Navbar />
+    <div className="min-h-screen bg-[#FDFCF8] text-[#292524] relative selection:bg-[#FFB7B2]/30 selection:text-[#292524]">
+      {/* Global Grain Texture Layer */}
+      <GrainOverlay />
+
+      {/* Floating Pill Navigation */}
+      <Navigation />
+
+      {/* Main Single-Column Flow */}
       <main>
         <Hero />
-        <ArchitectureFlow />
-        <FeaturesGrid />
-        <InteractiveLivePreview />
+        <HorizontalScenarioScroll />
         <SupportedTemplates />
-        <PricingCalculator />
+        <AppExperiencePreview />
+        <DiaryTestimonials />
+        <InteractiveFaqAccordion />
+        <WaitlistConversion />
       </main>
+
+      {/* Tactile Footer */}
       <Footer />
     </div>
   );
