@@ -99,6 +99,16 @@ class Heading extends Component
         try {
             $this->authorize('manage', $this->database);
 
+            $team = currentTeam() ?? $this->database->environment?->project?->team;
+            if (function_exists('checkResourceLimitForDeployment')) {
+                $check = checkResourceLimitForDeployment($team, $this->database);
+                if (! ($check['allowed'] ?? false)) {
+                    $this->dispatch('open-plan-limit-modal', $check);
+
+                    return;
+                }
+            }
+
             $activity = RestartDatabase::run($this->database);
             $this->js("window.dispatchEvent(new CustomEvent('startdatabase'))");
             $this->dispatch('activityMonitor', $activity->id, ServiceStatusChanged::class);

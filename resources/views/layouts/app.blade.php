@@ -80,7 +80,7 @@
                     <div class="flex shrink-0 items-center gap-2 min-w-0">
                         <a href="{{ ((auth()->id() === 0 || isInstanceAdmin()) && ! session('impersonating')) ? route('admin.index') : '/' }}" {{ wireNavigate() }} title="Beryl"
                             class="flex items-center gap-2 hover:opacity-80 transition-opacity">
-                            <img src="/beryl-logo.png" alt="Beryl"
+                            <img src="/beryl-logo.png" alt="" aria-hidden="true"
                                 class="size-6 shrink-0" />
                             <span x-show="!collapsed" class="text-[15px] font-semibold tracking-tight text-black dark:text-white">Beryl</span>
                         </a>

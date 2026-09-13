@@ -27,7 +27,7 @@ class SettingsDropdown extends Component
 
     public function getCurrentVersionProperty()
     {
-        return 'v'.config('constants.coolify.version');
+        return 'v'.ltrim(env('BERYL_VERSION', config('app.version', '1.0.0')), 'v');
     }
 
     public function openWhatsNewModal()

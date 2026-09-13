@@ -188,11 +188,17 @@
                         <span class="ml-1 rounded-full bg-neutral-100 px-1.5 py-px text-[10px] text-neutral-500 dark:bg-white/[0.06] dark:text-fg-dim"
                             :class="activeTab === 'database' && 'bg-coollabs/10 !text-coollabs dark:!bg-warning/15 dark:!text-warning'">{{ $totalDatabases }}</span>
                     </button>
+                    <button type="button" @click="activeTab = 'service'"
+                        :class="activeTab === 'service' ? 'border-b-2 border-coollabs text-coollabs dark:border-warning dark:text-warning pb-2 font-semibold' : 'pb-2 text-neutral-500 hover:text-neutral-800 dark:text-fg-dim dark:hover:text-fg'">
+                        Services
+                        <span class="ml-1 rounded-full bg-neutral-100 px-1.5 py-px text-[10px] text-neutral-500 dark:bg-white/[0.06] dark:text-fg-dim"
+                            :class="activeTab === 'service' && 'bg-coollabs/10 !text-coollabs dark:!bg-warning/15 dark:!text-warning'">{{ $totalServices }}</span>
+                    </button>
                     <button type="button" @click="activeTab = 'all'"
                         :class="activeTab === 'all' ? 'border-b-2 border-coollabs text-coollabs dark:border-warning dark:text-warning pb-2 font-semibold' : 'pb-2 text-neutral-500 hover:text-neutral-800 dark:text-fg-dim dark:hover:text-fg'">
                         All resources
                         <span class="ml-1 rounded-full bg-neutral-100 px-1.5 py-px text-[10px] text-neutral-500 dark:bg-white/[0.06] dark:text-fg-dim"
-                            :class="activeTab === 'all' && 'bg-coollabs/10 !text-coollabs dark:!bg-warning/15 dark:!text-warning'">{{ $recentResources->count() }}</span>
+                            :class="activeTab === 'all' && 'bg-coollabs/10 !text-coollabs dark:!bg-warning/15 dark:!text-warning'">{{ $totalApplications + $totalDatabases + $totalServices }}</span>
                     </button>
                 </div>
 

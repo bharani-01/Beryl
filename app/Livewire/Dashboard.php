@@ -169,9 +169,9 @@ class Dashboard extends Component
                     }
                 } catch (\Throwable) {}
 
-                // Databases (PostgreSQL)
+                // Databases (all standalone types: PostgreSQL, Redis, MySQL, MariaDB, MongoDB, KeyDB, Dragonfly, ClickHouse)
                 try {
-                    $dbs = $env->postgresqls()->take(6)->get();
+                    $dbs = $env->databases();
                     foreach ($dbs as $db) {
                         $updated = $db->updated_at ? Carbon::parse($db->updated_at) : now();
                         $status = $db->status ?? 'stopped';
@@ -202,7 +202,7 @@ class Dashboard extends Component
 
                 // Services
                 try {
-                    $services = $env->services()->take(6)->get();
+                    $services = $env->services()->take(10)->get();
                     foreach ($services as $svc) {
                         $updated = $svc->updated_at ? Carbon::parse($svc->updated_at) : now();
                         $status = $svc->status ?? 'stopped';
@@ -233,7 +233,7 @@ class Dashboard extends Component
             }
         }
 
-        $this->recentResources = $resources->sortByDesc('updated_at')->take(10)->values();
+        $this->recentResources = $resources->sortByDesc('updated_at')->take(25)->values();
 
         // Build recent team activities
         $activities = collect();

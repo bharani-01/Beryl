@@ -180,6 +180,17 @@ class Heading extends Component
     {
         try {
             $this->authorizeService('deploy');
+
+            $team = currentTeam() ?? $this->service->environment?->project?->team;
+            if (function_exists('checkResourceLimitForDeployment')) {
+                $check = checkResourceLimitForDeployment($team, $this->service);
+                if (! ($check['allowed'] ?? false)) {
+                    $this->dispatch('open-plan-limit-modal', $check);
+
+                    return;
+                }
+            }
+
             $this->checkDeployments();
             if ($this->isDeploymentProgress) {
                 $this->dispatch('error', 'There is a deployment in progress.');
@@ -221,6 +232,17 @@ class Heading extends Component
     {
         try {
             $this->authorizeService('deploy');
+
+            $team = currentTeam() ?? $this->service->environment?->project?->team;
+            if (function_exists('checkResourceLimitForDeployment')) {
+                $check = checkResourceLimitForDeployment($team, $this->service);
+                if (! ($check['allowed'] ?? false)) {
+                    $this->dispatch('open-plan-limit-modal', $check);
+
+                    return;
+                }
+            }
+
             $this->checkDeployments();
             if ($this->isDeploymentProgress) {
                 $this->dispatch('error', 'There is a deployment in progress.');

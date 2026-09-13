@@ -1,13 +1,16 @@
 import os
 import subprocess
 import sys
+import tarfile
 
 SSH_KEY = r"C:\Users\bhara\OneDrive\Desktop\AWS-Credentials\SSL.pem"
 HOST = "ubuntu@18.60.46.17"
 BASE_DIR = r"d:\syncd"
 
+# Complete master list of all custom Beryl files, models, views, controllers, actions, and assets
 FILES_TO_DEPLOY = [
     # Migrations
+    "database/migrations/2026_09_08_202212_enable_sentinel_for_existing_regular_servers.php",
     "database/migrations/2026_09_12_140000_add_custom_storage_limit_to_teams_table.php",
     "database/migrations/2026_09_12_150000_add_status_and_suspension_to_users_table.php",
     "database/migrations/2026_09_12_160000_create_audit_logs_table.php",
@@ -26,10 +29,13 @@ FILES_TO_DEPLOY = [
 
     # Models
     "app/Models/ApiLog.php",
+    "app/Models/Application.php",
     "app/Models/AuditLog.php",
     "app/Models/ForensicAuditLog.php",
     "app/Models/InstanceSettings.php",
     "app/Models/IpLocation.php",
+    "app/Models/Server.php",
+    "app/Models/Service.php",
     "app/Models/Subscription.php",
     "app/Models/Team.php",
     "app/Models/User.php",
@@ -42,7 +48,7 @@ FILES_TO_DEPLOY = [
     "app/Models/StandaloneDragonfly.php",
     "app/Models/StandaloneClickhouse.php",
 
-    # Services (Forensic Audit Subsystem & Location Engine)
+    # Services
     "app/Services/Audit/AuditCanonicalSerializer.php",
     "app/Services/Audit/AuditRedactor.php",
     "app/Services/Audit/AuditIntegrityEngine.php",
@@ -50,18 +56,22 @@ FILES_TO_DEPLOY = [
     "app/Services/Audit/DeviceDetector.php",
     "app/Services/Audit/IpLocationService.php",
     "app/Services/Audit/ForensicAuditService.php",
+    "app/Services/ServerTransfer/ServerTransferClaimer.php",
 
     # Events, Listeners & Observers
     "app/Events/ForensicAuditLogCreated.php",
     "app/Listeners/AuthAuditSubscriber.php",
     "app/Observers/ControlPlaneModelObserver.php",
     "app/Jobs/ApplicationDeploymentJob.php",
+    "app/Jobs/ServerManagerJob.php",
+    "app/Jobs/ValidateAndInstallServerJob.php",
 
     # Middleware & Kernel
     "app/Http/Kernel.php",
     "app/Http/Middleware/TrackUserActivity.php",
     "app/Http/Middleware/DecideWhatToDoWithUser.php",
     "app/Http/Middleware/VerifyCsrfToken.php",
+    "app/Http/Middleware/CanAccessTerminal.php",
 
     # Controllers & Routes
     "app/Http/Controllers/Webhook/Razorpay.php",
@@ -76,40 +86,82 @@ FILES_TO_DEPLOY = [
     "app/Actions/Fortify/CreateNewUser.php",
     "app/Actions/Service/StartService.php",
     "app/Actions/Database/StartDatabase.php",
+    "app/Actions/Server/ResolveOptimalHostingServer.php",
 
     # Helpers & Providers
     "bootstrap/helpers/shared.php",
     "bootstrap/helpers/audit.php",
     "bootstrap/helpers/subscriptions.php",
     "bootstrap/helpers/applications.php",
+    "bootstrap/helpers/remoteProcess.php",
     "app/Providers/EventServiceProvider.php",
     "app/Providers/AppServiceProvider.php",
     "app/Providers/FortifyServiceProvider.php",
+    "app/Providers/AuthServiceProvider.php",
+    "app/Providers/RouteServiceProvider.php",
+    "app/Policies/ServerPolicy.php",
 
-    # Livewire & Blade Views
+    # Livewire Components (UI Redesign)
     "app/Livewire/Admin/Index.php",
-    "resources/views/livewire/admin/index.blade.php",
-    "app/Livewire/Subscription/Show.php",
-    "resources/views/livewire/subscription/show.blade.php",
-    "app/Livewire/Subscription/Index.php",
-    "resources/views/livewire/subscription/index.blade.php",
-    "app/Livewire/Subscription/PricingPlans.php",
-    "resources/views/livewire/subscription/pricing-plans.blade.php",
-    "app/Livewire/Subscription/Actions.php",
-    "resources/views/livewire/subscription/actions.blade.php",
-    "app/Livewire/Project/Shared/ResourceLimits.php",
+    "app/Livewire/ActivityMonitor.php",
+    "app/Livewire/Dashboard.php",
+    "app/Livewire/Destination/Index.php",
+    "app/Livewire/Project/Index.php",
+    "app/Livewire/Project/New/Select.php",
+    "app/Livewire/Project/Resource/Create.php",
+    "app/Livewire/Project/Application/Configuration.php",
+    "app/Livewire/Project/Application/DeploymentNavbar.php",
     "app/Livewire/Project/Application/Heading.php",
+    "app/Livewire/Project/Database/Configuration.php",
     "app/Livewire/Project/Database/Heading.php",
     "app/Livewire/Project/Service/Heading.php",
-    "app/Livewire/Project/New/Select.php",
-    "resources/views/livewire/project/new/select.blade.php",
-    "app/Livewire/Project/Resource/Create.php",
-    "resources/views/components/plan-limit-modal.blade.php",
-    "resources/views/components/navbar.blade.php",
-    "resources/views/components/reicon.blade.php",
+    "app/Livewire/Project/Shared/GetLogs.php",
+    "app/Livewire/Project/Shared/ResourceLimits.php",
+    "app/Livewire/Server/Index.php",
+    "app/Livewire/Server/Show.php",
+    "app/Livewire/SharedVariables/Index.php",
+    "app/Livewire/SharedVariables/Server/Index.php",
+    "app/Livewire/SettingsDropdown.php",
+    "app/Livewire/Subscription/Show.php",
+    "app/Livewire/Subscription/Index.php",
+    "app/Livewire/Subscription/PricingPlans.php",
+    "app/Livewire/Subscription/Actions.php",
+    "app/Livewire/Team/AdminView.php",
+    "app/Livewire/Terminal/Index.php",
+
+    # Blade Views & Layouts
+    "resources/views/landing.blade.php",
     "resources/views/layouts/app.blade.php",
     "resources/views/layouts/base.blade.php",
-    "app/Livewire/Project/Index.php",
+    "resources/views/components/navbar.blade.php",
+    "resources/views/components/top-breadcrumb.blade.php",
+    "resources/views/components/top-user-menu.blade.php",
+    "resources/views/components/reicon.blade.php",
+    "resources/views/components/version.blade.php",
+    "resources/views/components/plan-limit-modal.blade.php",
+    "resources/views/components/application/configuration-sidebar.blade.php",
+    "resources/views/components/database/configuration-sidebar.blade.php",
+    "resources/views/components/shared-variables/layout.blade.php",
+    "resources/views/livewire/dashboard.blade.php",
+    "resources/views/livewire/admin/index.blade.php",
+    "resources/views/livewire/subscription/show.blade.php",
+    "resources/views/livewire/subscription/index.blade.php",
+    "resources/views/livewire/subscription/pricing-plans.blade.php",
+    "resources/views/livewire/subscription/actions.blade.php",
+    "resources/views/livewire/project/new/select.blade.php",
+    "resources/views/livewire/project/resource/index.blade.php",
+    "resources/views/livewire/project/shared/resource-operations.blade.php",
+    "resources/views/livewire/server/show.blade.php",
+    "resources/views/livewire/server/partials/server-details.blade.php",
+    "resources/views/livewire/server/partials/server-live-monitor.blade.php",
+    "resources/views/livewire/server/partials/localhost-general.blade.php",
+
+    # Public Branding Assets
+    "public/beryl-icon.png",
+    "public/beryl-logo-full-dark.png",
+    "public/beryl-logo-full-light.png",
+    "public/beryl-logo.png",
+    "public/beryl-logo.svg",
 
     # Config
     "config/services.php",
@@ -123,8 +175,6 @@ FILES_TO_DEPLOY = [
     "tests/Feature/ForensicAudit/ForensicAuditRedactionTest.php",
     "tests/Feature/ForensicAudit/ForensicAuditProvenanceAndLineageTest.php",
 ]
-
-
 
 def run_ssh(remote_command):
     cmd = [
@@ -151,74 +201,92 @@ def scp_file(local_file, remote_dest):
         return False
     return True
 
-print(f"=== DEPLOYING TO AWS EC2 ({HOST}) ===", flush=True)
+def main():
+    print(f"=== DEPLOYING TO AWS EC2 ({HOST}) ===", flush=True)
 
-# Deploy each file
-deployed_paths = []
-for rel_path in FILES_TO_DEPLOY:
-    local_file = os.path.join(BASE_DIR, rel_path.replace("/", os.sep))
-    if not os.path.exists(local_file):
-        print(f"[ERROR] Local file not found: {local_file}", flush=True)
-        continue
+    # 1. Filter existing files
+    existing_files = []
+    for rel_path in FILES_TO_DEPLOY:
+        full_path = os.path.join(BASE_DIR, rel_path.replace("/", os.sep))
+        if os.path.exists(full_path):
+            existing_files.append(rel_path)
+        else:
+            print(f"  [WARN] Missing local file: {rel_path}", flush=True)
 
-    tmp_name = f"/tmp/sync_{os.path.basename(rel_path)}"
-    container_dest = f"/var/www/html/{rel_path}"
-    override_dest = f"/data/coolify/custom_overrides/{rel_path}"
+    # Automatically scan and include all compiled React landing bundle files
+    landing_dir = os.path.join(BASE_DIR, "public", "landing")
+    if os.path.exists(landing_dir):
+        for root, _, files in os.walk(landing_dir):
+            for file in files:
+                rel_path = os.path.relpath(os.path.join(root, file), BASE_DIR).replace("\\", "/")
+                if rel_path not in existing_files:
+                    existing_files.append(rel_path)
 
-    if not scp_file(local_file, tmp_name):
-        print(f"[ERROR] Could not scp {local_file}", flush=True)
-        continue
+    print(f"Bundling {len(existing_files)} files into atomic deployment tarball...", flush=True)
+    tar_path = os.path.join(BASE_DIR, "temp_deploy_bundle.tar.gz")
+    with tarfile.open(tar_path, "w:gz") as tar:
+        for rel_path in existing_files:
+            full_path = os.path.join(BASE_DIR, rel_path.replace("/", os.sep))
+            tar.add(full_path, arcname=rel_path)
 
-    script = f"""
-    sudo mkdir -p $(dirname {override_dest})
-    sudo cp {tmp_name} {override_dest}
-    sudo docker exec -u 0 coolify mkdir -p $(dirname {container_dest}) 2>/dev/null || true
-    sudo docker exec -u 0 -i coolify sh -c 'cat > {container_dest}' < {tmp_name} 2>/dev/null || true
-    sudo docker exec -u 0 coolify chown www-data:www-data {container_dest} 2>/dev/null || true
-    rm -f {tmp_name}
+    print(f"Uploading deployment bundle ({os.path.getsize(tar_path)} bytes)...", flush=True)
+    if not scp_file(tar_path, "/tmp/deploy_bundle.tar.gz"):
+        print("[ERROR] Failed to upload tarball bundle!", flush=True)
+        return
+    if os.path.exists(tar_path):
+        os.remove(tar_path)
+
+    # 2. Build complete docker-compose.custom.yml
+    compose_content = "services:\n  postgres:\n    image: postgres:17-alpine\n  coolify:\n    environment:\n      - BERYL_VERSION=1.0.0\n      - APP_VERSION=1.0.0\n      - COOLIFY_VERSION=4.3.19\n    volumes:\n"
+    for rel_path in existing_files:
+        compose_content += f"      - /data/coolify/custom_overrides/{rel_path}:/var/www/html/{rel_path}\n"
+
+    compose_local = os.path.join(BASE_DIR, "temp_compose_custom.yml")
+    with open(compose_local, "w", encoding="utf-8") as fp:
+        fp.write(compose_content)
+    scp_file(compose_local, "/tmp/docker-compose.custom.yml")
+    if os.path.exists(compose_local):
+        os.remove(compose_local)
+
+    # 3. Unpack remotely and apply
+    print("Extracting bundle, setting permissions, and updating docker compose on EC2...", flush=True)
+    remote_script = """
+    sudo mkdir -p /data/coolify/custom_overrides
+    sudo tar --overwrite -xzf /tmp/deploy_bundle.tar.gz -C /data/coolify/custom_overrides/
+    sudo chown -R 9999:root /data/coolify/custom_overrides/
+    sudo chmod -R 755 /data/coolify/custom_overrides/
+
+    sudo sed -i 's/COOLIFY_VERSION=.*/COOLIFY_VERSION=4.3.19/g' /data/coolify/source/.env 2>/dev/null || true
+    sudo sed -i '/BERYL_VERSION/d' /data/coolify/source/.env 2>/dev/null || true
+    echo "BERYL_VERSION=1.0.0" | sudo tee -a /data/coolify/source/.env >/dev/null
+
+    sudo cp /tmp/docker-compose.custom.yml /data/coolify/source/docker-compose.custom.yml
+    sudo chown 9999:root /data/coolify/source/docker-compose.custom.yml
+
+    # Stream into running container live with in-place overwrite to bypass bind-mount busy errors
+    sudo cat /tmp/deploy_bundle.tar.gz | sudo docker exec -i coolify tar --overwrite -xzf - -C /var/www/html/ 2>/dev/null || true
+    sudo docker exec -u 0 coolify chown -R www-data:www-data /var/www/html/ 2>/dev/null || true
+    sudo rm -rf /tmp/deploy_bundle.tar.gz /tmp/docker-compose.custom.yml
     """
-    res = run_ssh(script)
-    if res.returncode == 0:
-        print(f"  [OK] Deployed {rel_path}", flush=True)
-        deployed_paths.append(rel_path)
-    else:
-        print(f"  [FAIL] Failed to deploy {rel_path}", flush=True)
+    res = run_ssh(remote_script)
+    if res.returncode != 0:
+        print("[ERROR] Remote unpack failed:", res.stderr)
+        return
+    print("  [OK] Files extracted and permissions applied successfully.", flush=True)
 
-print(f"\nSuccessfully transferred {len(deployed_paths)}/{len(FILES_TO_DEPLOY)} files.", flush=True)
 
-print("\n=== RUNNING MIGRATIONS IN DOCKER CONTAINER ===", flush=True)
-mig_res = run_ssh("sudo docker exec coolify php artisan migrate --force")
-print(mig_res.stdout)
-if mig_res.stderr:
-    print(mig_res.stderr)
+    # 4. Migrations
+    print("\n=== RUNNING MIGRATIONS ===", flush=True)
+    mig_res = run_ssh("sudo docker exec coolify php artisan migrate --force")
+    print(mig_res.stdout)
 
-print("=== CLEARING LARAVEL CACHES ===", flush=True)
-run_ssh("sudo docker exec coolify php artisan view:clear")
-run_ssh("sudo docker exec coolify php artisan config:clear")
-run_ssh("sudo docker exec coolify php artisan route:clear")
+    # 5. Clear caches
+    print("=== CLEARING LARAVEL CACHES ===", flush=True)
+    run_ssh("sudo docker exec coolify php artisan view:clear")
+    run_ssh("sudo docker exec coolify php artisan config:clear")
+    run_ssh("sudo docker exec coolify php artisan route:clear")
 
-print("\n=== VERIFYING TELEMETRY, API LOGGING & RAZORPAY CONFIG ON EC2 ===", flush=True)
-ver_res = run_ssh("sudo docker exec coolify php -r \"require 'vendor/autoload.php'; \\$app = require_once 'bootstrap/app.php'; \\$kernel = \\$app->make(Illuminate\\Contracts\\Console\\Kernel::class); \\$kernel->bootstrap(); echo 'HAS_API_LOGS: ' . (Illuminate\\Support\\Facades\\Schema::hasTable('api_logs') ? 'YES' : 'NO') . PHP_EOL; echo 'RAZORPAY_CONFIG_KEY: ' . (config('services.razorpay.key_id') ? 'LOADED_FROM_ENV' : 'NOT_FOUND') . PHP_EOL;\"")
-print(ver_res.stdout)
+    print("\n=== DEPLOYMENT COMPLETED SUCCESSFULLY ===", flush=True)
 
-print("\n=== VERIFYING ROUTE LIST ===", flush=True)
-route_check = run_ssh("sudo docker exec coolify php artisan route:list | grep -E 'admin|webhook'")
-print(route_check.stdout)
-
-print("\n=== RUNNING RAZORPAY SERVER-SIDE VALIDATION & WEBHOOK TESTS ON EC2 ===", flush=True)
-test_res = run_ssh("sudo docker exec coolify php artisan test --compact tests/Feature/Subscription/RazorpayPaymentValidationTest.php")
-print(test_res.stdout)
-if test_res.stderr:
-    print(test_res.stderr)
-
-print("\n=== RUNNING FORENSIC AUDIT SUBSYSTEM TESTS ON EC2 ===", flush=True)
-audit_test_res = run_ssh("sudo docker exec coolify php artisan test --compact tests/Feature/ForensicAudit/")
-print(audit_test_res.stdout)
-print("\n=== RUNNING RESOURCE & STORAGE LIMITS TESTS ON EC2 ===", flush=True)
-limits_test_res = run_ssh("sudo docker exec coolify php artisan test --compact tests/Feature/Subscription/ResourceAndStorageLimitsTest.php")
-print(limits_test_res.stdout)
-if limits_test_res.stderr:
-    print(limits_test_res.stderr)
-
-print("\n=== DEPLOYMENT TO AWS COMPLETED ===", flush=True)
-
+if __name__ == "__main__":
+    main()

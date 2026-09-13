@@ -112,6 +112,7 @@ class Heading extends Component
                     }
                 }
 
+                $limits = function_exists('teamResourceLimits') ? teamResourceLimits($team) : [];
                 $needsSave = false;
                 $planCpu = (float) ($limits['cpus'] ?? 0);
                 $appCpu = (float) ($this->application->limits_cpus ?? 0);
@@ -120,8 +121,8 @@ class Heading extends Component
                     $needsSave = true;
                 }
 
-                if (function_exists('isMemoryLimitExceeded') && isMemoryLimitExceeded($this->application->limits_memory, $limits['memory'])) {
-                    $this->application->limits_memory = (string) $limits['memory'];
+                if (function_exists('isMemoryLimitExceeded') && isMemoryLimitExceeded($this->application->limits_memory, $limits['memory'] ?? '1G')) {
+                    $this->application->limits_memory = (string) ($limits['memory'] ?? '1G');
                     $needsSave = true;
                 }
 
@@ -156,6 +157,12 @@ class Heading extends Component
                 deployment_uuid: $this->deploymentUuid,
                 force_rebuild: $force_rebuild,
             );
+            if ($result['status'] === 'limit_reached') {
+                $check = checkResourceLimitForDeployment($team, $this->application);
+                $this->dispatch('open-plan-limit-modal', $check);
+
+                return;
+            }
             if ($result['status'] === 'queue_full') {
                 $this->dispatch('error', 'Deployment queue full', $result['message']);
 
@@ -201,6 +208,16 @@ class Heading extends Component
         try {
             $this->authorize('deploy', $this->application);
 
+            $team = currentTeam();
+            if ($team && $team->id !== 0 && function_exists('checkResourceLimitForDeployment')) {
+                $check = checkResourceLimitForDeployment($team, $this->application);
+                if (! ($check['allowed'] ?? false)) {
+                    $this->dispatch('open-plan-limit-modal', $check);
+
+                    return;
+                }
+            }
+
             if ($this->application->additional_servers->count() > 0 && str($this->application->docker_registry_image_name)->isEmpty()) {
                 $this->dispatch('error', 'Failed to deploy', 'Before deploying to multiple servers, you must first set a Docker image in the General tab.<br>More information here: <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/multiple-servers">documentation</a>');
 
@@ -213,6 +230,12 @@ class Heading extends Component
                 deployment_uuid: $this->deploymentUuid,
                 restart_only: true,
             );
+            if ($result['status'] === 'limit_reached') {
+                $check = checkResourceLimitForDeployment($team, $this->application);
+                $this->dispatch('open-plan-limit-modal', $check);
+
+                return;
+            }
             if ($result['status'] === 'queue_full') {
                 $this->dispatch('error', 'Deployment queue full', $result['message']);
 

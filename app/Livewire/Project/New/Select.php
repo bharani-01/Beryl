@@ -78,13 +78,6 @@ class Select extends Component
             $this->environments = $project->environments;
             $this->selectedEnvironment = $this->environments->where('uuid', data_get($this->parameters, 'environment_uuid'))->firstOrFail()->name;
 
-            if (function_exists('checkResourceLimitForDeployment')) {
-                $check = checkResourceLimitForDeployment(currentTeam());
-                if (! ($check['allowed'] ?? true)) {
-                    $this->isResourceLimitReached = true;
-                    $this->resourceLimitCheck = $check;
-                }
-            }
 
             // Check if we have all required params for PostgreSQL type selection
             // This handles navigation from global search
@@ -382,19 +375,6 @@ class Select extends Component
             return;
         }
 
-        if (function_exists('checkResourceLimitForDeployment')) {
-            $check = checkResourceLimitForDeployment(currentTeam());
-            if (! ($check['allowed'] ?? true)) {
-                $this->loading = false;
-                $this->isResourceLimitReached = true;
-                $this->resourceLimitCheck = $check;
-                $this->dispatch('open-plan-limit-modal', $check);
-                $this->dispatch('error', $check['title'] ?? 'Active Resource Limit Reached', $check['message'] ?? 'Resource limit reached.');
-
-                return;
-            }
-        }
-
         $this->loading = true;
         $this->type = $type;
 
@@ -504,19 +484,6 @@ class Select extends Component
 
     public function whatToDoNext()
     {
-        if (function_exists('checkResourceLimitForDeployment')) {
-            $check = checkResourceLimitForDeployment(currentTeam());
-            if (! ($check['allowed'] ?? true)) {
-                $this->loading = false;
-                $this->isResourceLimitReached = true;
-                $this->resourceLimitCheck = $check;
-                $this->dispatch('open-plan-limit-modal', $check);
-                $this->dispatch('error', $check['title'] ?? 'Active Resource Limit Reached', $check['message'] ?? 'Resource limit reached.');
-
-                return;
-            }
-        }
-
         if ($this->type === 'postgresql') {
             $this->current_step = 'select-postgresql-type';
         } else {
