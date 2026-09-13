@@ -22,6 +22,7 @@ class InstanceSettings extends Model
         'do_not_track',
         'is_auto_update_enabled',
         'is_registration_enabled',
+        'bypass_email_verification',
         'next_channel',
         'smtp_enabled',
         'smtp_from_address',
@@ -102,6 +103,7 @@ class InstanceSettings extends Model
         'webhook_allowed_internal_hosts' => 'array',
         'webhook_allow_localhost' => 'boolean',
         'is_dashboard_force_https_enabled' => 'boolean',
+        'bypass_email_verification' => 'boolean',
         'razorpay_key_secret' => 'encrypted',
         'razorpay_webhook_secret' => 'encrypted',
     ];

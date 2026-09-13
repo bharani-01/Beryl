@@ -288,6 +288,8 @@
                     Eligible for a full refund &mdash; <strong class="dark:text-warning">{{ $refundDaysRemaining }}</strong> days remaining.
                 @elseif ($refundAlreadyUsed)
                     Refund already processed. Each team is eligible for one refund only.
+                @elseif ($isRazorpay)
+                    Razorpay refund requests must be raised via our support team. <a class="underline dark:text-white" href="{{ config('constants.urls.contact') }}" target="_blank">Contact billing support.</a>
                 @else
                     Not eligible for a refund.
                 @endif

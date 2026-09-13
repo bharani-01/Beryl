@@ -26,6 +26,5 @@ Route::post('/source/gitea/events/manual', [Gitea::class, 'manual']);
 
 Route::post('/payments/stripe/events', [Stripe::class, 'events']);
 Route::post('/payments/razorpay/events', [Razorpay::class, 'events'])->name('webhooks.razorpay');
-Route::post('/razorpay', [Razorpay::class, 'events'])->name('webhooks.razorpay.direct');
-Route::post('/razorpay/events', [Razorpay::class, 'events']);
+
 

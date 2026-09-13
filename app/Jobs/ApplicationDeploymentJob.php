@@ -19,6 +19,7 @@ use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
 use App\Notifications\Application\DeploymentFailed;
 use App\Notifications\Application\DeploymentSuccess;
+use App\Services\Audit\ForensicAuditService;
 use App\Support\ValidationPatterns;
 use App\Traits\EnvironmentVariableAnalyzer;
 use App\Traits\ExecuteRemoteCommand;
@@ -311,6 +312,15 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
             'horizon_job_worker' => gethostname(),
         ]);
+
+        try {
+            ForensicAuditService::recordDeployment(
+                eventType: 'deployment.started',
+                provenance: $this->getDeploymentProvenance(),
+                operationId: 'deploy-'.$this->deployment_uuid
+            );
+        } catch (Throwable) {
+        }
         if ($this->server->isFunctional() === false) {
             $this->application_deployment_queue->addLogEntry('Server is not functional.');
             $this->fail('Server is not functional.');
@@ -5183,6 +5193,16 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         }
 
         $this->sendDeploymentNotification(DeploymentSuccess::class);
+
+        try {
+            ForensicAuditService::recordDeployment(
+                eventType: $this->rollback ? 'deployment.rolled_back' : 'deployment.succeeded',
+                provenance: $this->getDeploymentProvenance(),
+                result: 'SUCCESS',
+                operationId: 'deploy-'.$this->deployment_uuid
+            );
+        } catch (Throwable) {
+        }
     }
 
     /**
@@ -5191,6 +5211,17 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
     private function handleFailedDeployment(): void
     {
         $this->sendDeploymentNotification(DeploymentFailed::class);
+
+        try {
+            ForensicAuditService::recordDeployment(
+                eventType: 'deployment.failed',
+                provenance: $this->getDeploymentProvenance(),
+                result: 'FAILURE',
+                failureReason: 'Deployment execution failed or container healthcheck failed',
+                operationId: 'deploy-'.$this->deployment_uuid
+            );
+        } catch (Throwable) {
+        }
     }
 
     /**
@@ -5269,5 +5300,32 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 }
             }
         }
+    }
+
+    /**
+     * Gather comprehensive forensic deployment lineage and provenance.
+     */
+    private function getDeploymentProvenance(): array
+    {
+        return [
+            'deployment_id' => $this->deployment_uuid,
+            'application_id' => (string) $this->application->id,
+            'application_name' => $this->application->name,
+            'project_id' => $this->application->environment?->project_id,
+            'environment' => $this->application->environment?->name ?? 'production',
+            'commit_sha' => $this->commit,
+            'branch' => $this->application->git_branch,
+            'repository' => $this->application->git_repository,
+            'build_id' => (string) $this->application_deployment_queue_id,
+            'builder' => $this->build_pack ?? 'dockerfile',
+            'trigger_source' => $this->application_deployment_queue->is_webhook ? 'WEBHOOK' : ($this->application_deployment_queue->is_api ? 'API' : 'DASHBOARD'),
+            'actor_type' => $this->application_deployment_queue->is_webhook ? 'AUTOMATION' : 'HUMAN',
+            'actor_id' => 'deployment-controller',
+            'runtime_container_id' => $this->container_name ?? null,
+            'previous_deployment_id' => null,
+            'server_name' => $this->server?->name,
+            'pull_request_id' => $this->pull_request_id,
+            'commit_message' => $this->application_deployment_queue->commit_message,
+        ];
     }
 }

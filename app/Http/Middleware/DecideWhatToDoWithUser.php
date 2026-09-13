@@ -67,7 +67,7 @@ class DecideWhatToDoWithUser
         if (isInstanceAdmin() && ($request->routeIs('settings.*') || $request->path() === 'admin')) {
             return $next($request);
         }
-        if (! auth()->user()->hasVerifiedEmail()) {
+        if (! isEmailVerificationBypassed() && ! auth()->user()->hasVerifiedEmail()) {
             if ($request->path() === 'verify' || in_array($request->path(), allowedPathsForInvalidAccounts()) || $request->routeIs('verify.verify')) {
                 return $next($request);
             }
@@ -90,7 +90,7 @@ class DecideWhatToDoWithUser
 
             return redirect()->route('onboarding');
         }
-        if (auth()->user()->hasVerifiedEmail() && $request->path() === 'verify') {
+        if ((auth()->user()->hasVerifiedEmail() || isEmailVerificationBypassed()) && $request->path() === 'verify') {
             return redirect(RouteServiceProvider::HOME);
         }
 

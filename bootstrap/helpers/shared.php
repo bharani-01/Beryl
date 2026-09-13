@@ -950,6 +950,15 @@ function isCloud(): bool
     return ! config('constants.coolify.self_hosted');
 }
 
+function isEmailVerificationBypassed(): bool
+{
+    try {
+        return (bool) (instanceSettings()?->bypass_email_verification ?? false);
+    } catch (\Throwable) {
+        return false;
+    }
+}
+
 /**
  * Resolve the queue used for application deployments, database starts and service starts.
  *

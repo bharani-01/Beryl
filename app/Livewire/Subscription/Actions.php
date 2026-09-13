@@ -205,6 +205,20 @@ class Actions extends Component
             return true;
         }
 
+        // Razorpay subscriptions: downgrade locally; actual payment cancellation
+        // must be done via the Razorpay dashboard or support ticket.
+        $isRazorpaySubscription = str_starts_with((string) $subscription->stripe_subscription_id, 'sub_rzp_')
+            || str_starts_with((string) $subscription->stripe_customer_id, 'cust_rzp_');
+
+        if ($isRazorpaySubscription) {
+            $team->subscriptionEnded();
+            \Log::info("Razorpay subscription downgraded locally for team {$team->name} (ID: {$team->id}).");
+            $this->dispatch('success', 'Subscription cancelled. Your cloud resources have been downgraded. For a refund, please contact our support team.');
+            $this->redirect(route('subscription.index'), navigate: true);
+
+            return true;
+        }
+
         try {
             $stripe = app(StripeClient::class);
             $stripe->subscriptions->cancel($subscription->stripe_subscription_id);

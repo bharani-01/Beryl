@@ -112,13 +112,14 @@
                 </a>
             </li>
 
-            {{-- 4. Subscriptions --}}
+
+            {{-- 5. Transactions --}}
             <li>
-                <a title="Subscriptions" {{ wireNavigate() }}
-                    class="{{ $currentTab === 'subscriptions' ? 'menu-item-active menu-item' : 'menu-item' }}"
-                    :class="collapsed && 'lg:justify-center lg:px-0'" href="{{ route('admin.index', ['tab' => 'subscriptions']) }}">
+                <a title="Transactions" {{ wireNavigate() }}
+                    class="{{ $currentTab === 'transactions' ? 'menu-item-active menu-item' : 'menu-item' }}"
+                    :class="collapsed && 'lg:justify-center lg:px-0'" href="{{ route('admin.index', ['tab' => 'transactions']) }}">
                     <x-reicon name="subscription" class="menu-item-icon" />
-                    <span class="menu-item-label font-medium" :class="collapsed && 'lg:hidden'">Subscriptions</span>
+                    <span class="menu-item-label font-medium" :class="collapsed && 'lg:hidden'">Transactions</span>
                 </a>
             </li>
 

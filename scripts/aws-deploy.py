@@ -13,14 +13,40 @@ FILES_TO_DEPLOY = [
     "database/migrations/2026_09_12_160000_create_audit_logs_table.php",
     "database/migrations/2026_09_12_170000_add_razorpay_settings_to_instance_settings_table.php",
     "database/migrations/2026_09_12_180000_create_api_logs_and_user_telemetry.php",
+    "database/migrations/2026_09_12_193949_add_transaction_tracking_to_subscriptions_table.php",
+    "database/migrations/2026_09_13_051000_add_bypass_email_verification_to_instance_settings_table.php",
+    "database/migrations/2026_09_13_070000_create_forensic_audit_logs_table.php",
+    "database/migrations/2026_09_13_130000_create_ip_locations_table.php",
+    "database/migrations/2026_09_13_131000_add_recent_locations_to_users_table.php",
+    "database/migrations/2026_09_13_132000_add_device_and_geo_to_forensic_audit_logs.php",
+
+    # Exceptions
+    "app/Exceptions/SecurityException.php",
 
     # Models
     "app/Models/ApiLog.php",
     "app/Models/AuditLog.php",
+    "app/Models/ForensicAuditLog.php",
     "app/Models/InstanceSettings.php",
+    "app/Models/IpLocation.php",
     "app/Models/Subscription.php",
     "app/Models/Team.php",
     "app/Models/User.php",
+
+    # Services (Forensic Audit Subsystem & Location Engine)
+    "app/Services/Audit/AuditCanonicalSerializer.php",
+    "app/Services/Audit/AuditRedactor.php",
+    "app/Services/Audit/AuditIntegrityEngine.php",
+    "app/Services/Audit/AuditEvidenceVault.php",
+    "app/Services/Audit/DeviceDetector.php",
+    "app/Services/Audit/IpLocationService.php",
+    "app/Services/Audit/ForensicAuditService.php",
+
+    # Events, Listeners & Observers
+    "app/Events/ForensicAuditLogCreated.php",
+    "app/Listeners/AuthAuditSubscriber.php",
+    "app/Observers/ControlPlaneModelObserver.php",
+    "app/Jobs/ApplicationDeploymentJob.php",
 
     # Middleware & Kernel
     "app/Http/Kernel.php",
@@ -32,10 +58,17 @@ FILES_TO_DEPLOY = [
     "app/Http/Controllers/Webhook/Razorpay.php",
     "routes/webhooks.php",
     "routes/web.php",
+    "routes/channels.php",
+
+    # Actions
+    "app/Actions/Fortify/CreateNewUser.php",
 
     # Helpers & Providers
+    "bootstrap/helpers/shared.php",
     "bootstrap/helpers/audit.php",
     "bootstrap/helpers/subscriptions.php",
+    "app/Providers/EventServiceProvider.php",
+    "app/Providers/AppServiceProvider.php",
     "app/Providers/FortifyServiceProvider.php",
 
     # Livewire & Blade Views
@@ -61,6 +94,10 @@ FILES_TO_DEPLOY = [
     # Tests
     "tests/Feature/AuditLogsIconConsistencyTest.php",
     "tests/Feature/Subscription/RazorpayPaymentValidationTest.php",
+    "tests/Feature/AdminUserRoleAndTeamTest.php",
+    "tests/Feature/ForensicAudit/ForensicAuditChainTest.php",
+    "tests/Feature/ForensicAudit/ForensicAuditRedactionTest.php",
+    "tests/Feature/ForensicAudit/ForensicAuditProvenanceAndLineageTest.php",
 ]
 
 
@@ -111,8 +148,9 @@ for rel_path in FILES_TO_DEPLOY:
     script = f"""
     sudo mkdir -p $(dirname {override_dest})
     sudo cp {tmp_name} {override_dest}
-    sudo docker exec coolify mkdir -p $(dirname {container_dest}) 2>/dev/null || true
-    sudo docker cp {tmp_name} coolify:{container_dest} 2>/dev/null || true
+    sudo docker exec -u 0 coolify mkdir -p $(dirname {container_dest}) 2>/dev/null || true
+    sudo docker exec -u 0 -i coolify sh -c 'cat > {container_dest}' < {tmp_name} 2>/dev/null || true
+    sudo docker exec -u 0 coolify chown www-data:www-data {container_dest} 2>/dev/null || true
     rm -f {tmp_name}
     """
     res = run_ssh(script)
@@ -148,6 +186,12 @@ test_res = run_ssh("sudo docker exec coolify php artisan test --compact tests/Fe
 print(test_res.stdout)
 if test_res.stderr:
     print(test_res.stderr)
+
+print("\n=== RUNNING FORENSIC AUDIT SUBSYSTEM TESTS ON EC2 ===", flush=True)
+audit_test_res = run_ssh("sudo docker exec coolify php artisan test --compact tests/Feature/ForensicAudit/")
+print(audit_test_res.stdout)
+if audit_test_res.stderr:
+    print(audit_test_res.stderr)
 
 print("\n=== DEPLOYMENT TO AWS COMPLETED ===", flush=True)
 

@@ -16,6 +16,10 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Broadcast;
 
 Broadcast::channel('team.{teamId}', function (User $user, int $teamId) {
+    if ($teamId === 0 && ($user->isInstanceAdmin() || $user->id === 0 || isInstanceAdmin())) {
+        return true;
+    }
+
     if ($user->teams->pluck('id')->contains($teamId)) {
         return true;
     }

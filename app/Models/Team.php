@@ -240,6 +240,12 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
             'stripe_trial_already_ended' => false,
             'stripe_past_due' => false,
         ]);
+
+        // Reset elevated storage quota so the team falls back to plan defaults
+        if ($this->custom_storage_limit_gb !== null) {
+            $this->update(['custom_storage_limit_gb' => null]);
+        }
+
         foreach ($this->servers as $server) {
             $server->settings()->update([
                 'is_usable' => false,

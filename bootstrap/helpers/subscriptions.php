@@ -594,10 +594,17 @@ function validateAndActivateRazorpayPayment(
     // 5. Atomic database activation
     try {
         $sub = $team->subscription ?: new \App\Models\Subscription(['team_id' => $team->id]);
-        $sub->stripe_plan_id = $planKey;
-        $sub->stripe_invoice_paid = true;
+        $sub->stripe_plan_id        = $planKey;
+        $sub->stripe_invoice_paid   = true;
         $sub->stripe_subscription_id = 'sub_rzp_' . $paymentId;
-        $sub->stripe_customer_id = 'cust_rzp_' . $team->id;
+        $sub->stripe_customer_id    = 'cust_rzp_' . $team->id;
+        // Transaction tracking columns
+        $sub->razorpay_payment_id   = $paymentId;
+        $sub->razorpay_order_id     = $orderId ?: null;
+        $sub->amount_paid_paise     = $expectedAmountPaise;
+        $sub->currency              = 'INR';
+        $sub->billing_interval      = $interval;
+        $sub->activated_at          = now();
         $sub->save();
 
         if (! empty($plan['storage_gb'])) {

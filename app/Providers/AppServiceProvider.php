@@ -39,8 +39,16 @@ class AppServiceProvider extends ServiceProvider
 
     private function configureModels(): void
     {
-        // Disabled because it's causing issues with the application
-        // Model::shouldBeStrict();
+        // Forensic Audit Model Observers
+        $observer = \App\Observers\ControlPlaneModelObserver::class;
+        \App\Models\Project::observe($observer);
+        \App\Models\Environment::observe($observer);
+        \App\Models\Application::observe($observer);
+        \App\Models\Server::observe($observer);
+        \App\Models\PrivateKey::observe($observer);
+        \App\Models\EnvironmentVariable::observe($observer);
+        \App\Models\Team::observe($observer);
+        \App\Models\User::observe($observer);
     }
 
     private function configurePasswords(): void

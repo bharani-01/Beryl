@@ -18,12 +18,21 @@ class Subscription extends Model
         'stripe_trial_already_ended',
         'stripe_past_due',
         'stripe_refunded_at',
+        // Razorpay transaction tracking
+        'razorpay_payment_id',
+        'razorpay_order_id',
+        'amount_paid_paise',
+        'currency',
+        'billing_interval',
+        'activated_at',
     ];
 
     protected function casts(): array
     {
         return [
             'stripe_refunded_at' => 'datetime',
+            'activated_at'       => 'datetime',
+            'amount_paid_paise'  => 'integer',
         ];
     }
 
@@ -34,6 +43,12 @@ class Subscription extends Model
 
     public function billingInterval(): string
     {
+        // Razorpay subscriptions: use the directly stored interval
+        if ($this->billing_interval && in_array($this->billing_interval, ['monthly', 'yearly'], true)) {
+            return $this->billing_interval;
+        }
+
+        // Stripe: derive from plan ID via config lookup
         if ($this->stripe_plan_id) {
             $configKey = collect(config('subscription'))
                 ->search($this->stripe_plan_id);

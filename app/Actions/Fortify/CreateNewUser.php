@@ -74,7 +74,7 @@ class CreateNewUser implements CreatesNewUsers
                 'password' => Hash::make($input['password']),
             ]);
             $team = $user->teams()->first();
-            if (isCloud()) {
+            if (isCloud() && ! isEmailVerificationBypassed()) {
                 SendVerificationEmailJob::dispatch($user);
             } else {
                 $user->markEmailAsVerified();

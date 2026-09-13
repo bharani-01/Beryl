@@ -9,6 +9,7 @@ use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\AuditLog;
 use App\Models\Environment;
+use App\Models\ForensicAuditLog;
 use App\Models\InstanceSettings;
 use App\Models\LocalPersistentVolume;
 use App\Models\Project;
@@ -85,6 +86,8 @@ class Index extends Component
     // Platform settings
     public bool $isRegistrationEnabled = true;
 
+    public bool $bypassEmailVerification = false;
+
     // Unified "Manage Tenant" Modal
     public bool $showManageModal = false;
 
@@ -99,6 +102,8 @@ class Index extends Component
     public ?int $managingTeamId = null;
 
     public ?string $managingTeamName = null;
+
+    public ?string $managingUserRole = null;
 
     public bool $managingUserIsSuspended = false;
 
@@ -145,6 +150,8 @@ class Index extends Component
 
     public ?string $drawerTeamName = null;
 
+    public array $drawerUserTeams = [];
+
     public ?string $drawerLastActive = null;
 
     public ?string $drawerPresenceStatus = 'offline';
@@ -166,6 +173,8 @@ class Index extends Component
     public ?string $drawerSuspensionReason = null;
 
     public array $drawerApiLogs = [];
+
+    public array $drawerRecentLocations = [];
 
     public array $drawerAuditLogs = [];
 
@@ -200,6 +209,33 @@ class Index extends Component
     public ?array $selectedAuditPayload = null;
 
     public ?string $selectedAuditEvent = null;
+
+    // Forensic Audit Subsystem & Live Streaming State
+    public bool $isLiveStreamActive = true;
+
+    public array $streamedAuditEvents = [];
+
+    public array $recentLiveEventIds = [];
+
+    public int $streamedEventsCount = 0;
+
+    public string $auditCategoryFilter = 'all';
+
+    public string $auditSeverityFilter = 'all';
+
+    public string $auditSourceFilter = 'all';
+
+    public ?int $auditTenantFilter = null;
+
+    public ?array $auditIntegrityResult = null;
+
+    public bool $isVerifyingIntegrity = false;
+
+    public bool $showForensicModal = false;
+
+    public ?array $selectedForensicEvent = null;
+
+    public ?string $evidenceExportUrl = null;
 
     // Queues & Background Workers State
     public array $failedJobsList = [];
@@ -258,6 +294,11 @@ class Index extends Component
 
     public string $subFilter = 'all'; // 'all', 'paid', 'starter', 'pro', 'business', 'trial', 'unpaid'
 
+    // Transactions Tab State
+    public string $txSearch = '';
+
+    public string $txFilter = 'all'; // 'all', 'razorpay', 'stripe', 'refunded'
+
     // Razorpay Gateway Config (Zero-Trust Masked & Encrypted at Rest)
     public string $razorpayKeyId = '';
 
@@ -277,6 +318,20 @@ class Index extends Component
 
     public string $razorpayWebhookUrl = '';
 
+    // Drawer Subscription & Transaction State
+    public ?array $drawerLiveSubscription = null;
+
+    public array $drawerSubscriptionHistory = [];
+
+    public array $drawerTransactions = [];
+
+    public string $drawerSelectedPlan = 'trial';
+
+    public bool $drawerSubPaidStatus = false;
+
+    public ?int $drawerCustomStorageGb = null;
+
+    public ?int $drawerTeamId = null;
 
     public function mount()
     {
@@ -284,7 +339,7 @@ class Index extends Component
 
         if (request()->has('tab')) {
             $reqTab = request()->get('tab');
-            $this->tab = ($reqTab === 'all') ? 'users' : $reqTab;
+            $this->tab = in_array($reqTab, ['subscriptions', 'all'], true) ? 'users' : $reqTab;
         }
 
         $this->loadPlatformSettings();
@@ -299,6 +354,9 @@ class Index extends Component
 
     public function setTab(string $newTab): void
     {
+        if ($newTab === 'subscriptions') {
+            $newTab = 'users';
+        }
         $this->tab = $newTab;
 
         if ($newTab === 'audit-logs') {
@@ -318,6 +376,7 @@ class Index extends Component
     {
         $settings = instanceSettings();
         $this->isRegistrationEnabled = (bool) ($settings?->is_registration_enabled ?? true);
+        $this->bypassEmailVerification = (bool) ($settings?->bypass_email_verification ?? false);
         $this->instanceFqdn = (string) ($settings?->fqdn ?? '');
         $this->instanceEmail = (string) ($settings?->smtp_from_address ?? '');
         $this->isAutoUpdateEnabled = (bool) ($settings?->is_auto_update_enabled ?? true);
@@ -361,6 +420,66 @@ class Index extends Component
         }
     }
 
+    public function toggleBypassEmailVerification(): void
+    {
+        $this->authorizeAdminAccess();
+        $settings = InstanceSettings::find(0);
+        if ($settings) {
+            $settings->bypass_email_verification = ! (bool) $settings->bypass_email_verification;
+            $settings->save();
+            $this->bypassEmailVerification = (bool) $settings->bypass_email_verification;
+
+            if (function_exists('auditLog')) {
+                auditLog('admin.settings.bypass_email_verification_toggled', [
+                    'bypass_email_verification' => $this->bypassEmailVerification,
+                ]);
+            }
+
+            if ($this->bypassEmailVerification) {
+                $this->dispatch('success', 'Email verification bypassed. All users can now log in without email verification.');
+            } else {
+                $this->dispatch('warning', 'Email verification requirement is now strictly enforced.');
+            }
+        } else {
+            $this->dispatch('error', 'Unable to locate instance settings.');
+        }
+    }
+
+    public function verifyAllUsers(): void
+    {
+        $this->authorizeAdminAccess();
+        $count = User::whereNull('email_verified_at')->update(['email_verified_at' => now()]);
+
+        if (function_exists('auditLog')) {
+            auditLog('admin.users.verified_all', [
+                'count' => $count,
+            ]);
+        }
+
+        $this->dispatch('success', "Successfully verified {$count} unverified user account(s). All users are now verified!");
+    }
+
+    public function verifyUser(int $userId): void
+    {
+        $this->authorizeAdminAccess();
+        $user = User::find($userId);
+        if (! $user) {
+            $this->dispatch('error', 'User not found.');
+            return;
+        }
+
+        $user->markEmailAsVerified();
+
+        if (function_exists('auditLog')) {
+            auditLog('admin.user.email_verified', [
+                'user_id' => $user->id,
+                'email' => $user->email,
+            ]);
+        }
+
+        $this->dispatch('success', "Email marked as verified for {$user->name} ({$user->email}).");
+    }
+
     public function saveGeneralSettings(): void
     {
         $this->authorizeAdminAccess();
@@ -384,8 +503,15 @@ class Index extends Component
     public function saveSecuritySettings(): void
     {
         $this->authorizeAdminAccess();
+        $settings = InstanceSettings::find(0);
+        if ($settings) {
+            $settings->bypass_email_verification = $this->bypassEmailVerification;
+            $settings->save();
+        }
+
         auditLog('admin.security.settings_updated', [
             'enforce_2fa_all' => $this->enforce2FaAll,
+            'bypass_email_verification' => $this->bypassEmailVerification,
             'ip_allowlist' => $this->adminIpAllowlist,
         ]);
         $this->dispatch('success', 'Security policies updated successfully.');
@@ -773,6 +899,366 @@ class Index extends Component
         $this->selectedAuditEvent = null;
     }
 
+    public function getListeners(): array
+    {
+        $teamId = auth()->user()?->currentTeam()?->id ?? 0;
+
+        return [
+            'echo-private:team.0,ForensicAuditLogCreated' => 'onForensicAuditLogCreated',
+            'echo-private:team.0,.ForensicAuditLogCreated' => 'onForensicAuditLogCreated',
+            'echo-private:team.0,App\Events\ForensicAuditLogCreated' => 'onForensicAuditLogCreated',
+            "echo-private:team.{$teamId},ForensicAuditLogCreated" => 'onForensicAuditLogCreated',
+            "echo-private:team.{$teamId},.ForensicAuditLogCreated" => 'onForensicAuditLogCreated',
+            "echo-private:team.{$teamId},App\Events\ForensicAuditLogCreated" => 'onForensicAuditLogCreated',
+        ];
+    }
+
+    public function onForensicAuditLogCreated(array $payload): void
+    {
+        if (! $this->isLiveStreamActive) {
+            return;
+        }
+
+        $log = $payload['log'] ?? $payload;
+        if (! empty($log)) {
+            $eventId = $log['event_id'] ?? null;
+            if ($eventId) {
+                if (in_array($eventId, $this->recentLiveEventIds, true)) {
+                    return;
+                }
+                array_unshift($this->recentLiveEventIds, $eventId);
+                if (count($this->recentLiveEventIds) > 50) {
+                    array_pop($this->recentLiveEventIds);
+                }
+            }
+
+            array_unshift($this->streamedAuditEvents, $log);
+            if (count($this->streamedAuditEvents) > 100) {
+                array_pop($this->streamedAuditEvents);
+            }
+            $this->streamedEventsCount++;
+
+            // Unset computed property cache to guarantee table re-queries fresh data immediately
+            unset($this->forensicAuditLogs);
+        }
+    }
+
+    public function triggerTestAuditEvent(): void
+    {
+        $this->authorizeAdminAccess();
+
+        \App\Services\Audit\ForensicAuditService::record([
+            'event_type' => 'admin.audit.stream_ping',
+            'event_category' => 'SYSTEM_INTEGRITY',
+            'severity' => 'INFORMATIONAL',
+            'action_operation' => 'TEST_PING',
+            'action_result' => 'SUCCESS',
+            'target_type' => 'WebSocketStream',
+            'target_name' => 'Soketi-Realtime-Probe',
+            'payload' => [
+                'triggered_by' => auth()->user()?->email ?? 'admin',
+                'timestamp' => now()->toIso8601String(),
+                'message' => 'Real-time WebSocket live streaming probe',
+            ],
+        ]);
+
+        $this->dispatch('success', 'Test forensic audit event broadcasted via WebSockets!');
+    }
+
+    public function toggleLiveStream(): void
+    {
+        $this->isLiveStreamActive = ! $this->isLiveStreamActive;
+    }
+
+    public function clearStreamBuffer(): void
+    {
+        $this->streamedAuditEvents = [];
+        $this->recentLiveEventIds = [];
+        $this->streamedEventsCount = 0;
+        unset($this->forensicAuditLogs);
+    }
+
+    public function getForensicAuditLogsProperty()
+    {
+        if (! Schema::hasTable('forensic_audit_logs')) {
+            return collect();
+        }
+
+        $query = ForensicAuditLog::query()->latest('sequence_number');
+
+        if ($this->auditSearch !== '') {
+            $s = $this->auditSearch;
+            $query->where(function ($q) use ($s) {
+                $q->where('event_type', 'like', "%{$s}%")
+                    ->orWhere('actor_email', 'like', "%{$s}%")
+                    ->orWhere('actor_id', 'like', "%{$s}%")
+                    ->orWhere('ip_address', 'like', "%{$s}%")
+                    ->orWhere('target_name', 'like', "%{$s}%")
+                    ->orWhere('target_id', 'like', "%{$s}%")
+                    ->orWhere('device_summary', 'like', "%{$s}%")
+                    ->orWhere('country', 'like', "%{$s}%")
+                    ->orWhere('city', 'like', "%{$s}%")
+                    ->orWhere('isp', 'like', "%{$s}%")
+                    ->orWhere('event_hash', 'like', "%{$s}%")
+                    ->orWhere('operation_id', 'like', "%{$s}%");
+            });
+        }
+
+        if ($this->auditCategoryFilter !== 'all') {
+            $query->where('event_category', $this->auditCategoryFilter);
+        }
+
+        if ($this->auditSeverityFilter !== 'all') {
+            $query->where('severity', $this->auditSeverityFilter);
+        }
+
+        if ($this->auditSourceFilter !== 'all') {
+            $query->where('source_type', $this->auditSourceFilter);
+        }
+
+        if ($this->auditTenantFilter) {
+            $query->where('organization_id', $this->auditTenantFilter);
+        }
+
+        return $query->limit(60)->get();
+    }
+
+    public function resetAuditFilters(): void
+    {
+        $this->auditSearch = '';
+        $this->auditSeverityFilter = 'all';
+        $this->auditCategoryFilter = 'all';
+        $this->auditSourceFilter = 'all';
+        $this->auditTenantFilter = null;
+    }
+
+    public function exportAuditLogsCsv(): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $this->authorizeAdminAccess();
+
+        $query = ForensicAuditLog::query()->latest('sequence_number');
+
+        if ($this->auditSearch !== '') {
+            $s = $this->auditSearch;
+            $query->where(function ($q) use ($s) {
+                $q->where('event_type', 'like', "%{$s}%")
+                    ->orWhere('actor_email', 'like', "%{$s}%")
+                    ->orWhere('actor_id', 'like', "%{$s}%")
+                    ->orWhere('ip_address', 'like', "%{$s}%")
+                    ->orWhere('target_name', 'like', "%{$s}%")
+                    ->orWhere('target_id', 'like', "%{$s}%")
+                    ->orWhere('device_summary', 'like', "%{$s}%")
+                    ->orWhere('country', 'like', "%{$s}%")
+                    ->orWhere('city', 'like', "%{$s}%")
+                    ->orWhere('isp', 'like', "%{$s}%");
+            });
+        }
+
+        if ($this->auditCategoryFilter !== 'all') {
+            $query->where('event_category', $this->auditCategoryFilter);
+        }
+
+        if ($this->auditSeverityFilter !== 'all') {
+            $query->where('severity', $this->auditSeverityFilter);
+        }
+
+        if ($this->auditSourceFilter !== 'all') {
+            $query->where('source_type', $this->auditSourceFilter);
+        }
+
+        if ($this->auditTenantFilter) {
+            $query->where('organization_id', $this->auditTenantFilter);
+        }
+
+        $logs = $query->limit(1000)->get();
+        $filename = 'audit-logs-'.now()->format('Y-m-d-His').'.csv';
+
+        return response()->streamDownload(function () use ($logs) {
+            $handle = fopen('php://output', 'w');
+            fputcsv($handle, [
+                'Sequence',
+                'Timestamp (UTC)',
+                'Actor Email',
+                'Actor Type',
+                'Event Type',
+                'Category',
+                'Severity',
+                'Operation',
+                'Result',
+                'Device',
+                'IP Address',
+                'Country',
+                'City',
+                'Region',
+                'ISP',
+                'Target Type',
+                'Target Name',
+            ]);
+
+            foreach ($logs as $log) {
+                fputcsv($handle, [
+                    $log->sequence_number,
+                    $log->event_time?->toISOString() ?? '',
+                    $log->actor_email ?: ($log->actor_id ?: 'system'),
+                    $log->actor_type,
+                    $log->event_type,
+                    $log->event_category,
+                    $log->severity,
+                    $log->action_operation,
+                    $log->action_result,
+                    $log->device_summary ?: 'Desktop / Web',
+                    $log->ip_address ?: '',
+                    $log->country ?: '',
+                    $log->city ?: '',
+                    $log->region ?: '',
+                    $log->isp ?: '',
+                    $log->target_type ?: '',
+                    $log->target_name ?: '',
+                ]);
+            }
+
+            fclose($handle);
+        }, $filename, [
+            'Content-Type' => 'text/csv',
+        ]);
+    }
+
+    public function verifyAuditIntegrity(): void
+    {
+        $this->isVerifyingIntegrity = true;
+        try {
+            $this->auditIntegrityResult = \App\Services\Audit\AuditIntegrityEngine::verifyChain($this->auditTenantFilter);
+            auditLog('admin.audit.integrity_verified', [
+                'result_status' => $this->auditIntegrityResult['status'] ?? 'UNKNOWN',
+                'verified_count' => $this->auditIntegrityResult['verified_count'] ?? 0,
+            ]);
+        } catch (\Throwable $e) {
+            $this->auditIntegrityResult = [
+                'valid' => false,
+                'status' => 'ERROR',
+                'message' => 'Verification failed: '.$e->getMessage(),
+                'verified_count' => 0,
+                'checked_at' => now()->toIso8601String(),
+            ];
+        } finally {
+            $this->isVerifyingIntegrity = false;
+        }
+    }
+
+    public function exportForensicEvidence(): \Symfony\Component\HttpFoundation\BinaryFileResponse|\Livewire\Features\SupportRedirects\Redirector|null
+    {
+        try {
+            $bundle = \App\Services\Audit\AuditEvidenceVault::exportBundle($this->auditTenantFilter);
+            auditLog('admin.audit.evidence_exported', [
+                'export_id' => $bundle['export_id'],
+                'record_count' => $bundle['record_count'],
+            ]);
+
+            return response()->download($bundle['file_path'], $bundle['filename'], [
+                'Content-Type' => 'application/zip',
+            ]);
+        } catch (\Throwable $e) {
+            $this->dispatch('error', 'Failed to export evidence: '.$e->getMessage());
+
+            return null;
+        }
+    }
+
+    public function viewForensicEvent(string $eventId): void
+    {
+        $log = ForensicAuditLog::where('event_id', $eventId)->first();
+        if ($log) {
+            $geo = (! empty($log->country) || ! empty($log->location_summary))
+                ? [
+                    'country' => $log->country,
+                    'country_code' => $log->country_code,
+                    'city' => $log->city,
+                    'region' => $log->region,
+                    'isp' => $log->isp,
+                    'location_summary' => $log->location_summary,
+                ]
+                : \App\Services\Audit\IpLocationService::resolve($log->ip_address);
+
+            $device = (! empty($log->device_summary))
+                ? [
+                    'type' => $log->device_type,
+                    'summary' => $log->device_summary,
+                ]
+                : \App\Services\Audit\DeviceDetector::detect($log->user_agent);
+
+            $locationSummary = $geo['location_summary']
+                ?? ((! empty($geo['city']) && ! empty($geo['country']) && $geo['city'] !== 'Unknown City')
+                    ? ($geo['city'] . ', ' . $geo['country'])
+                    : ($geo['country'] ?? 'Local / Private Network'));
+
+            $this->selectedForensicEvent = [
+                'id' => $log->id,
+                'event_id' => $log->event_id,
+                'sequence_number' => $log->sequence_number,
+                'operation_id' => $log->operation_id,
+                'parent_event_id' => $log->parent_event_id,
+                'root_event_id' => $log->root_event_id,
+                'event_type' => $log->event_type,
+                'event_category' => $log->event_category,
+                'severity' => $log->severity,
+                'action_operation' => $log->action_operation,
+                'action_result' => $log->action_result,
+                'action_reason' => $log->action_reason,
+                'ticket_id' => $log->ticket_id,
+                'change_request_id' => $log->change_request_id,
+                'approval_id' => $log->approval_id,
+                'actor_type' => $log->actor_type,
+                'actor_id' => $log->actor_id,
+                'actor_email' => $log->actor_email,
+                'actor_role' => $log->actor_role,
+                'source_type' => $log->source_type,
+                'organization_id' => $log->organization_id,
+                'project_id' => $log->project_id,
+                'environment_name' => $log->environment_name,
+                'target_type' => $log->target_type,
+                'target_id' => $log->target_id,
+                'target_name' => $log->target_name,
+                'deployment_provenance' => $log->deployment_provenance,
+                'ip_address' => $log->ip_address,
+                'device_type' => $device['type'] ?? $log->device_type,
+                'device_summary' => $device['summary'] ?? $log->device_summary,
+                'country' => $geo['country'] ?? $log->country,
+                'country_code' => $geo['country_code'] ?? $log->country_code,
+                'city' => $geo['city'] ?? $log->city,
+                'region' => $geo['region'] ?? $log->region,
+                'isp' => $geo['isp'] ?? $log->isp,
+                'location_summary' => $locationSummary,
+                'user_agent' => $log->user_agent,
+                'route' => $log->route,
+                'http_method' => $log->http_method,
+                'status_code' => $log->status_code,
+                'correlation_id' => $log->correlation_id,
+                'request_id' => $log->request_id,
+                'session_id' => $log->session_id,
+                'event_time' => $log->event_time?->toISOString(),
+                'received_at' => $log->received_at?->toISOString(),
+                'persisted_at' => $log->persisted_at?->toISOString(),
+                'actor' => $log->actor,
+                'target' => $log->target,
+                'action' => $log->action,
+                'request' => $log->request,
+                'changes' => $log->changes,
+                'authentication' => $log->authentication,
+                'source' => $log->source,
+                'security' => $log->security,
+                'previous_event_hash' => $log->previous_event_hash,
+                'event_hash' => $log->event_hash,
+            ];
+            $this->showForensicModal = true;
+        }
+    }
+
+    public function closeForensicModal(): void
+    {
+        $this->showForensicModal = false;
+        $this->selectedForensicEvent = null;
+    }
+
     public function getSubscriptionTenantsProperty()
     {
         $query = Team::where('id', '!=', 0)
@@ -813,6 +1299,50 @@ class Index extends Component
         }
 
         return $query->orderBy('id', 'asc')->get();
+    }
+
+    public function getTransactionsProperty()
+    {
+        $query = Subscription::query()
+            ->with(['team.members'])
+            ->where(function ($q) {
+                $q->where('stripe_invoice_paid', true)
+                    ->orWhereNotNull('razorpay_payment_id')
+                    ->orWhereNotNull('amount_paid_paise');
+            });
+
+        if ($this->txSearch !== '') {
+            $term = trim($this->txSearch);
+            $query->where(function ($q) use ($term) {
+                $q->where('razorpay_payment_id', 'like', "%{$term}%")
+                    ->orWhere('razorpay_order_id', 'like', "%{$term}%")
+                    ->orWhere('stripe_subscription_id', 'like', "%{$term}%")
+                    ->orWhere('stripe_plan_id', 'like', "%{$term}%")
+                    ->orWhereHas('team', function ($t) use ($term) {
+                        $t->where('name', 'like', "%{$term}%");
+                    })
+                    ->orWhereHas('team.members', function ($m) use ($term) {
+                        $m->where('email', 'like', "%{$term}%")
+                            ->orWhere('name', 'like', "%{$term}%");
+                    });
+            });
+        }
+
+        if ($this->txFilter === 'razorpay') {
+            $query->where(function ($q) {
+                $q->whereNotNull('razorpay_payment_id')
+                    ->orWhere('stripe_subscription_id', 'like', 'sub_rzp_%');
+            });
+        } elseif ($this->txFilter === 'stripe') {
+            $query->whereNotNull('stripe_subscription_id')
+                ->whereNull('razorpay_payment_id')
+                ->where('stripe_subscription_id', 'not like', 'sub_rzp_%');
+        } elseif ($this->txFilter === 'refunded') {
+            $query->whereNotNull('stripe_refunded_at');
+        }
+
+        return $query->orderByRaw('COALESCE(activated_at, updated_at, created_at) DESC')
+            ->get();
     }
 
     public function changeTeamPlan(int $teamId, string $newPlan): void
@@ -968,6 +1498,32 @@ class Index extends Component
         }
     }
 
+    public function forgetFailedJob(string $id): void
+    {
+        $this->authorizeAdminAccess();
+        try {
+            \Illuminate\Support\Facades\Artisan::call('queue:forget', ['id' => $id]);
+            auditLog('admin.queues.job_forgotten', ['job_id' => $id]);
+            $this->dispatch('success', "Failed job {$id} dismissed.");
+            $this->loadQueuesData();
+        } catch (\Throwable $e) {
+            $this->dispatch('error', 'Failed to remove job: ' . $e->getMessage());
+        }
+    }
+
+    public function flushFailedJobs(): void
+    {
+        $this->authorizeAdminAccess();
+        try {
+            \Illuminate\Support\Facades\Artisan::call('queue:flush');
+            auditLog('admin.queues.all_flushed');
+            $this->dispatch('success', 'All failed jobs cleared.');
+            $this->loadQueuesData();
+        } catch (\Throwable $e) {
+            $this->dispatch('error', 'Failed to clear jobs: ' . $e->getMessage());
+        }
+    }
+
     public function loadHostHealth(): void
     {
         $cpu = 0;
@@ -1048,36 +1604,7 @@ class Index extends Component
 
     public function openManageModal(int $userId): void
     {
-        $this->authorizeAdminAccess();
-        $user = User::with('teams.subscription')->find($userId);
-        if (! $user) {
-            $this->dispatch('error', 'User not found.');
-            return;
-        }
-
-        $team = $user->resolveStoredTeam() ?? $user->teams->first();
-
-        $this->managingUserId = $user->id;
-        $this->managingUserName = $user->name;
-        $this->managingUserEmail = $user->email;
-        $this->managingTeamId = $team?->id;
-        $this->managingTeamName = $team?->name;
-        $this->managingUserIsSuspended = (bool) $user->is_suspended;
-        $this->managingUserHas2Fa = (bool) $user->two_factor_confirmed_at;
-        $this->managingUserIsVerified = (bool) $user->email_verified_at;
-
-        $sub = $team?->subscription;
-        if ($sub) {
-            $this->selectedPlanId = $sub->stripe_plan_id ?? 'custom';
-            $this->subPaidStatus = (bool) $sub->stripe_invoice_paid;
-        } else {
-            $this->selectedPlanId = 'trial';
-            $this->subPaidStatus = false;
-        }
-
-        $this->customStorageGbInput = $team?->custom_storage_limit_gb;
-        $this->manageTab = 'subscription';
-        $this->showManageModal = true;
+        $this->inspectUserResources($userId, 'billing');
     }
 
     public function closeManageModal(): void
@@ -1089,6 +1616,7 @@ class Index extends Component
             'managingUserEmail',
             'managingTeamId',
             'managingTeamName',
+            'managingUserRole',
             'managingUserIsSuspended',
             'managingUserHas2Fa',
             'managingUserIsVerified',
@@ -1189,6 +1717,7 @@ class Index extends Component
             ]);
 
             $this->managingUserIsSuspended = (bool) $user->is_suspended;
+            $this->drawerIsSuspended = (bool) $user->is_suspended;
             $statusText = $user->is_suspended ? 'SUSPENDED' : 'UNSUSPENDED';
             $this->dispatch('success', "User {$user->email} has been {$statusText}.");
             $this->getSubscribers();
@@ -1227,6 +1756,7 @@ class Index extends Component
             ]);
 
             $this->managingUserHas2Fa = false;
+            $this->drawerTwoFactor = false;
             $this->dispatch('success', "Two-Factor Authentication cleared for {$user->email}.");
         }
     }
@@ -1236,7 +1766,7 @@ class Index extends Component
         $this->drawerActiveTab = $tab;
     }
 
-    public function inspectUserResources(int $userId): void
+    public function inspectUserResources(int $userId, string $tab = 'overview'): void
     {
         $this->authorizeAdminAccess();
         $user = User::with(['teams', 'tokens'])->find($userId);
@@ -1245,12 +1775,18 @@ class Index extends Component
             return;
         }
 
-        $team = $user->resolveStoredTeam() ?? $user->teams->first();
+        $team = $user->personalTeam();
 
         $this->drawerUserId = $user->id;
         $this->drawerUserName = $user->name;
         $this->drawerUserEmail = $user->email;
         $this->drawerTeamName = $team?->name;
+        $this->drawerUserTeams = $user->teams->map(fn ($t) => [
+            'id' => $t->id,
+            'name' => $t->name,
+            'personal_team' => (bool) $t->personal_team,
+            'role' => $t->pivot?->role ?? $user->roleInTeam($t->id) ?? 'member',
+        ])->toArray();
 
         $this->drawerLastActive = $user->last_active_at ? $user->last_active_at->diffForHumans() : 'Never seen';
         $this->drawerPresenceStatus = method_exists($user, 'presenceStatus') ? $user->presenceStatus() : ($user->last_active_at && $user->last_active_at->gt(now()->subMinutes(15)) ? 'online' : 'offline');
@@ -1262,6 +1798,7 @@ class Index extends Component
         $this->drawerTwoFactor = (bool) $user->two_factor_confirmed_at;
         $this->drawerIsSuspended = (bool) $user->is_suspended;
         $this->drawerSuspensionReason = $user->suspension_reason;
+        $this->drawerRecentLocations = is_array($user->recent_locations) ? $user->recent_locations : [];
 
         // Fetch User API Logs
         if (Schema::hasTable('api_logs')) {
@@ -1422,11 +1959,155 @@ class Index extends Component
                 ])->toArray();
         }
 
+        // Resolve Tenant Subscriptions, History & Transactions for Drawer
+        $this->drawerTeamId = $team?->id;
+        $this->drawerLiveSubscription = null;
+        $this->drawerSubscriptionHistory = [];
+        $this->drawerTransactions = [];
+        $this->drawerSelectedPlan = 'trial';
+        $this->drawerSubPaidStatus = false;
+        $this->drawerCustomStorageGb = $team?->custom_storage_limit_gb;
+
+        if ($team) {
+            $subs = Subscription::where('team_id', $team->id)->orderBy('id', 'desc')->get();
+            $latestSub = $subs->first();
+
+            if ($latestSub) {
+                $this->drawerSelectedPlan = $latestSub->stripe_plan_id ?? 'trial';
+                $this->drawerSubPaidStatus = (bool) $latestSub->stripe_invoice_paid;
+                $isPaid = (bool) $latestSub->stripe_invoice_paid;
+                $isRefunded = ! empty($latestSub->stripe_refunded_at);
+                $isPastDue = (bool) $latestSub->stripe_past_due;
+
+                $status = 'active';
+                if ($isRefunded) {
+                    $status = 'refunded';
+                } elseif ($isPastDue) {
+                    $status = 'past_due';
+                } elseif (! $isPaid) {
+                    $status = 'unpaid';
+                }
+
+                $gateway = 'Stripe';
+                if (! empty($latestSub->razorpay_payment_id) || str_starts_with((string) $latestSub->stripe_subscription_id, 'sub_rzp_')) {
+                    $gateway = 'Razorpay';
+                } elseif (empty($latestSub->stripe_subscription_id) && empty($latestSub->razorpay_payment_id)) {
+                    $gateway = 'Manual / System';
+                }
+
+                $this->drawerLiveSubscription = [
+                    'id' => $latestSub->id,
+                    'plan' => ucfirst($latestSub->stripe_plan_id ?? 'Trial'),
+                    'plan_raw' => $latestSub->stripe_plan_id ?? 'trial',
+                    'status' => $status,
+                    'is_paid' => $isPaid,
+                    'is_refunded' => $isRefunded,
+                    'is_past_due' => $isPastDue,
+                    'interval' => $latestSub->billingInterval(),
+                    'amount' => $latestSub->amount_paid_paise ? ($latestSub->amount_paid_paise / 100) : match (strtolower($latestSub->stripe_plan_id ?? '')) {
+                        'business', 'enterprise' => $this->planBusinessPrice,
+                        'pro' => $this->planProPrice,
+                        'starter', 'hobby' => $this->planHobbyPrice,
+                        default => 0,
+                    },
+                    'currency' => $latestSub->currency ?? 'INR',
+                    'gateway' => $gateway,
+                    'payment_id' => $latestSub->razorpay_payment_id ?? $latestSub->stripe_subscription_id ?? '—',
+                    'order_id' => $latestSub->razorpay_order_id ?? $latestSub->stripe_customer_id ?? '—',
+                    'activated_at' => $latestSub->activated_at?->format('M d, Y H:i') ?? $latestSub->created_at?->format('M d, Y H:i') ?? 'N/A',
+                    'updated_at' => $latestSub->updated_at?->format('M d, Y H:i') ?? 'N/A',
+                    'storage_limit_gb' => $team->custom_storage_limit_gb ?? null,
+                ];
+            } else {
+                $daysAgo = (int) $team->created_at->diffInDays(now());
+                $daysRemaining = max(0, 14 - $daysAgo);
+                $this->drawerLiveSubscription = [
+                    'id' => null,
+                    'plan' => 'Trial (14-day evaluation)',
+                    'plan_raw' => 'trial',
+                    'status' => $daysRemaining > 0 ? 'trial' : 'expired',
+                    'is_paid' => false,
+                    'is_refunded' => false,
+                    'is_past_due' => false,
+                    'interval' => '14-day trial',
+                    'amount' => 0,
+                    'currency' => 'INR',
+                    'gateway' => 'None',
+                    'payment_id' => '—',
+                    'order_id' => '—',
+                    'activated_at' => $team->created_at->format('M d, Y H:i'),
+                    'updated_at' => $team->updated_at->format('M d, Y H:i'),
+                    'storage_limit_gb' => $team->custom_storage_limit_gb ?? null,
+                    'trial_days_remaining' => $daysRemaining,
+                ];
+            }
+
+            // Subscription History: all subscription records
+            $this->drawerSubscriptionHistory = $subs->map(function ($s) {
+                $gateway = 'Stripe';
+                if (! empty($s->razorpay_payment_id) || str_starts_with((string) $s->stripe_subscription_id, 'sub_rzp_')) {
+                    $gateway = 'Razorpay';
+                } elseif (empty($s->stripe_subscription_id) && empty($s->razorpay_payment_id)) {
+                    $gateway = 'Manual';
+                }
+
+                $status = $s->stripe_refunded_at ? 'Refunded' : ($s->stripe_invoice_paid ? 'Active / Paid' : 'Unpaid');
+
+                return [
+                    'id' => $s->id,
+                    'plan' => ucfirst($s->stripe_plan_id ?? 'trial'),
+                    'interval' => $s->billingInterval(),
+                    'gateway' => $gateway,
+                    'status' => $status,
+                    'is_paid' => (bool) $s->stripe_invoice_paid,
+                    'amount' => $s->amount_paid_paise ? ($s->amount_paid_paise / 100) : 0,
+                    'currency' => $s->currency ?? 'INR',
+                    'created_at' => $s->created_at?->format('M d, Y H:i'),
+                    'activated_at' => $s->activated_at?->format('M d, Y H:i') ?? $s->created_at?->format('M d, Y H:i'),
+                    'refunded_at' => $s->stripe_refunded_at?->format('M d, Y H:i'),
+                    'payment_id' => $s->razorpay_payment_id ?? $s->stripe_subscription_id ?? ('SUB-' . $s->id),
+                ];
+            })->toArray();
+
+            // Transaction History: rows that represent payments / charges
+            $this->drawerTransactions = $subs->filter(function ($s) {
+                return (bool) $s->stripe_invoice_paid || ! empty($s->razorpay_payment_id) || ! empty($s->amount_paid_paise);
+            })->map(function ($tx) {
+                $gateway = 'Stripe';
+                if (! empty($tx->razorpay_payment_id) || str_starts_with((string) $tx->stripe_subscription_id, 'sub_rzp_')) {
+                    $gateway = 'Razorpay';
+                }
+
+                $amount = $tx->amount_paid_paise ? ($tx->amount_paid_paise / 100) : match (strtolower($tx->stripe_plan_id ?? '')) {
+                    'business', 'enterprise' => $this->planBusinessPrice,
+                    'pro' => $this->planProPrice,
+                    'starter', 'hobby' => $this->planHobbyPrice,
+                    default => 0,
+                };
+
+                return [
+                    'id' => $tx->id,
+                    'payment_id' => $tx->razorpay_payment_id ?? $tx->stripe_subscription_id ?? ('TXN-' . $tx->id),
+                    'order_id' => $tx->razorpay_order_id ?? $tx->stripe_customer_id ?? '—',
+                    'gateway' => $gateway,
+                    'plan' => ucfirst($tx->stripe_plan_id ?? 'Starter'),
+                    'interval' => $tx->billingInterval(),
+                    'amount' => $amount,
+                    'currency' => $tx->currency ?? 'INR',
+                    'is_paid' => (bool) $tx->stripe_invoice_paid,
+                    'is_refunded' => ! empty($tx->stripe_refunded_at),
+                    'refunded_at' => $tx->stripe_refunded_at?->format('M d, Y H:i'),
+                    'date' => ($tx->activated_at ?? $tx->created_at)?->format('M d, Y H:i'),
+                    'time_ago' => ($tx->activated_at ?? $tx->created_at)?->diffForHumans() ?? 'Recently',
+                ];
+            })->values()->toArray();
+        }
+
         $this->drawerApplications = $apps;
         $this->drawerDatabases = $dbs;
         $this->drawerServices = $services;
         $this->drawerVolumes = $vols;
-        $this->drawerActiveTab = 'overview';
+        $this->drawerActiveTab = $tab;
         $this->showResourceDrawer = true;
 
         auditLog('admin.user.inspected', [
@@ -1455,12 +2136,82 @@ class Index extends Component
             'drawerSuspensionReason',
             'drawerApiLogs',
             'drawerAuditLogs',
+            'drawerRecentLocations',
             'drawerApiTokens',
             'drawerApplications',
             'drawerDatabases',
             'drawerServices',
             'drawerVolumes',
+            'drawerLiveSubscription',
+            'drawerSubscriptionHistory',
+            'drawerTransactions',
+            'drawerSelectedPlan',
+            'drawerSubPaidStatus',
+            'drawerCustomStorageGb',
+            'drawerTeamId',
         ]);
+    }
+
+    public function saveDrawerSubscription(): void
+    {
+        $this->authorizeAdminAccess();
+
+        if (! $this->drawerTeamId) {
+            $this->dispatch('error', 'No active team found for this user.');
+            return;
+        }
+
+        $team = Team::find($this->drawerTeamId);
+        if (! $team) {
+            $this->dispatch('error', 'Team not found.');
+            return;
+        }
+
+        $sub = $team->subscription;
+        if (! $sub) {
+            $sub = new Subscription();
+            $sub->team_id = $team->id;
+        }
+
+        $sub->stripe_plan_id = $this->drawerSelectedPlan;
+        $sub->stripe_invoice_paid = (bool) $this->drawerSubPaidStatus;
+        $sub->activated_at = now();
+        $sub->save();
+
+        // Update custom storage limit
+        $team->custom_storage_limit_gb = $this->drawerCustomStorageGb ? (int) $this->drawerCustomStorageGb : null;
+        $team->save();
+
+        $plans = function_exists('getSubscriptionPlans') ? getSubscriptionPlans() : [];
+        if (empty($team->custom_storage_limit_gb) && isset($plans[$this->drawerSelectedPlan]['storage_gb'])) {
+            $team->custom_storage_limit_gb = (int) $plans[$this->drawerSelectedPlan]['storage_gb'];
+            $team->save();
+        }
+
+        foreach ($team->members as $member) {
+            \Illuminate\Support\Facades\Cache::forget('user:' . $member->id . ':team:' . $team->id);
+        }
+        $team->unsetRelation('subscription');
+
+        auditLog('admin.tenant.subscription_updated', [
+            'team_id' => $team->id,
+            'plan' => $this->drawerSelectedPlan,
+            'is_paid' => $this->drawerSubPaidStatus,
+            'storage_limit_gb' => $team->custom_storage_limit_gb,
+        ]);
+
+        $this->dispatch('success', "Subscription and quotas saved for {$team->name}.");
+        $this->inspectUserResources($this->drawerUserId, 'billing');
+        $this->getSubscribers();
+        $this->loadUsers();
+    }
+
+    public function updateDrawerUserPlan(?string $newPlan = null): void
+    {
+        if ($newPlan) {
+            $this->drawerSelectedPlan = $newPlan;
+        }
+        $this->saveDrawerSubscription();
     }
 
     public function openCreateTenantModal(): void
@@ -1604,7 +2355,7 @@ class Index extends Component
 
         $headers = [
             'Content-Type' => 'text/csv',
-            'Content-Disposition' => 'attachment; filename="coolify-tenants-' . date('Y-m-d') . '.csv"',
+            'Content-Disposition' => 'attachment; filename="' . strtolower(config('app.name', 'beryl')) . '-tenants-' . date('Y-m-d') . '.csv"',
             'Pragma' => 'no-cache',
             'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
             'Expires' => '0',
@@ -1630,7 +2381,7 @@ class Index extends Component
 
             $users = User::with('teams.subscription')->cursor();
             foreach ($users as $u) {
-                $team = $u->resolveStoredTeam() ?? $u->teams->first();
+                $team = $u->personalTeam();
                 $sub = $team?->subscription;
                 fputcsv($handle, [
                     $u->id,
@@ -1764,7 +2515,9 @@ class Index extends Component
     {
         return view('livewire.admin.index', array_merge(get_object_vars($this), [
             'auditLogs' => $this->auditLogs,
+            'forensicAuditLogs' => $this->forensicAuditLogs,
             'subscriptionTenants' => $this->subscriptionTenants,
+            'transactions' => $this->transactions,
         ]));
     }
 }

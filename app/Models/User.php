@@ -64,6 +64,7 @@ class User extends Authenticatable implements SendsEmail
         'last_api_call_at',
         'last_login_at',
         'last_login_ip',
+        'recent_locations',
     ];
 
     protected $hidden = [
@@ -84,7 +85,55 @@ class User extends Authenticatable implements SendsEmail
         'total_api_calls' => 'integer',
         'last_api_call_at' => 'datetime',
         'last_login_at' => 'datetime',
+        'recent_locations' => 'array',
     ];
+
+    /**
+     * Record an IP and device into the user's recent locations history (capped at 10 distinct locations).
+     */
+    public function recordLocation(string $ip, ?string $device = null): void
+    {
+        if (! $ip || trim($ip) === '') {
+            return;
+        }
+
+        $geo = \App\Services\Audit\IpLocationService::resolve($ip);
+        $locations = is_array($this->recent_locations) ? $this->recent_locations : [];
+
+        $foundIndex = null;
+        foreach ($locations as $idx => $loc) {
+            if (($loc['ip'] ?? '') === $ip) {
+                $foundIndex = $idx;
+                break;
+            }
+        }
+
+        $entry = [
+            'ip' => $ip,
+            'country' => $geo['country'] ?? 'Unknown',
+            'country_code' => $geo['country_code'] ?? null,
+            'flag' => null,
+            'city' => $geo['city'] ?? 'Unknown',
+            'region' => $geo['region'] ?? null,
+            'isp' => $geo['isp'] ?? null,
+            'device' => $device ?: ($foundIndex !== null ? ($locations[$foundIndex]['device'] ?? 'Web') : 'Web'),
+            'first_seen_at' => $foundIndex !== null ? ($locations[$foundIndex]['first_seen_at'] ?? now()->toIso8601String()) : now()->toIso8601String(),
+            'last_seen_at' => now()->toIso8601String(),
+            'hits_count' => $foundIndex !== null ? (($locations[$foundIndex]['hits_count'] ?? 1) + 1) : 1,
+        ];
+
+        if ($foundIndex !== null) {
+            unset($locations[$foundIndex]);
+        }
+
+        array_unshift($locations, $entry);
+        $locations = array_slice($locations, 0, 10);
+
+        $this->updateQuietly([
+            'recent_locations' => $locations,
+            'last_login_ip' => $ip,
+        ]);
+    }
 
     public function apiLogs()
     {
@@ -446,6 +495,29 @@ class User extends Authenticatable implements SendsEmail
         }
 
         return null;
+    }
+
+    /**
+     * Get the user's primary/personal team.
+     */
+    public function personalTeam(): ?Team
+    {
+        return $this->teams->firstWhere('personal_team', true)
+            ?? $this->teams->firstWhere('pivot.role', 'owner')
+            ?? $this->teams->first();
+    }
+
+    /**
+     * Get the user's primary role in their personal or first team.
+     */
+    public function primaryRole(): string
+    {
+        $team = $this->personalTeam();
+        if (! $team) {
+            return 'member';
+        }
+
+        return data_get($team, 'pivot.role') ?? $this->roleInTeam($team->id) ?? 'owner';
     }
 
     /**

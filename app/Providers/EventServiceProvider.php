@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Listeners\AuthAuditSubscriber;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
 use SocialiteProviders\Authentik\AuthentikExtendSocialite;
 use SocialiteProviders\Azure\AzureExtendSocialite;
@@ -24,6 +25,10 @@ class EventServiceProvider extends ServiceProvider
             InfomaniakExtendSocialite::class.'@handle',
             ZitadelExtendSocialite::class.'@handle',
         ],
+    ];
+
+    protected $subscribe = [
+        AuthAuditSubscriber::class,
     ];
 
     public function boot(): void
