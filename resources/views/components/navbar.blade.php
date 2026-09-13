@@ -206,7 +206,7 @@
                 </a>
             </li>
             <li>
-                <a title="Feedback" target="_blank" rel="noopener noreferrer" href="https://github.com/coollabsio/coolify/issues"
+                <a title="Feedback" target="_blank" rel="noopener noreferrer" href="https://github.com/bharani-01/Beryl/issues"
                     class="menu-item" :class="collapsed && 'lg:justify-center lg:px-0'">
                     <x-reicon name="feedback" class="menu-item-icon" />
                     <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Feedback</span>
@@ -290,7 +290,7 @@
                 </a>
             </li>
             <li>
-                <a title="Feedback" target="_blank" rel="noopener noreferrer" href="https://github.com/coollabsio/coolify/issues"
+                <a title="Feedback" target="_blank" rel="noopener noreferrer" href="https://github.com/bharani-01/Beryl/issues"
                     class="menu-item" :class="collapsed && 'lg:justify-center lg:px-0'">
                     <x-reicon name="feedback" class="menu-item-icon" />
                     <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Feedback</span>
