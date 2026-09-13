@@ -1659,6 +1659,7 @@ All notable changes to this project will be documented in this file.
 - Unbrand auth views and use dynamic app name in login and register templates
 - Replace hardcoded Coolify fallback with dynamic app name in base layout
 - Add standalone database models, subscription resource limits, API controllers, and deployment script
+- Highlight 1-click open source deployments and fix auth branding deployment
 
 ### 🐛 Bug Fixes
 
@@ -7370,6 +7371,7 @@ All notable changes to this project will be documented in this file.
 - *(ui)* Clarify application image retention cleanup options
 - Design external TLS redirect control
 - *(security)* Require scoped authorization checks and regression tests
+- Update changelog
 - Update changelog
 
 ### ⚡ Performance
