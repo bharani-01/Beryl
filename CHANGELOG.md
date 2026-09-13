@@ -7370,6 +7370,7 @@ All notable changes to this project will be documented in this file.
 - *(ui)* Clarify application image retention cleanup options
 - Design external TLS redirect control
 - *(security)* Require scoped authorization checks and regression tests
+- Update changelog
 
 ### ⚡ Performance
 
@@ -8382,6 +8383,7 @@ All notable changes to this project will be documented in this file.
 - *(notifications)* Remove broken notification interface
 - *(auth)* Remove unneeded return
 - *(sentinel)* Bump sentinel version from 0.0.22 to 1.0.1
+- Add node_modules dependencies
 
 ### ◀️ Revert
 
